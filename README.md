@@ -38,13 +38,36 @@ Cloudflare Cron（每分钟）─▶ Worker ─▶ MTProto（gramjs，经 cloudf
 | 需要 | 说明 |
 | --- | --- |
 | Cloudflare 账号 | 免费账号即可开始，见[费用与限制](#费用与限制) |
-| Node.js 18+（推荐 22） | 只用来运行 wrangler 部署 |
+| GitHub 账号 | 仅网页一键部署需要 |
+| Node.js 18+（推荐 22） | 仅命令行部署需要，网页一键部署不需要 |
 | Telegram `api_id` / `api_hash` | 在 <https://my.telegram.org/apps> 创建 |
 | AI 接口 | 任意 OpenAI 兼容服务，例如 DeepSeek |
 | 固定出口的 SOCKS5 代理（强烈建议） | 见[出口代理](#出口代理) |
 | Resend 账号（可选） | 用于邮箱找回密码和失败告警 |
 
 ## 部署
+
+### 方式一：网页一键部署（推荐，全程在浏览器里点）
+
+不需要装 Node，也不用敲命令。
+
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/chhbzhou/tg-scout)
+
+1. 点上面的 **Deploy to Cloudflare** 按钮，登录你的 Cloudflare 账号（没有就先注册）。
+2. 按提示连接你的 **GitHub 账号**并授权。Cloudflare 会把本项目复制一份到你自己的 GitHub 仓库。
+3. 在设置页确认项目名，**ADMIN_TOKEN** 一栏填你的登录密码：一个足够长的随机字符串，不要留默认值（默认值无法登录）。数据库不用管，会自动创建。
+4. 点 **Create and deploy**，等部署完成，页面会给出你的访问地址（形如 `https://tg-scout.<你的子域>.workers.dev`）。
+5. 打开地址，用第 3 步的密码登录，之后按下面的[配置](#配置)填写即可。
+
+以后在你自己的 GitHub 仓库里改代码并推送，Cloudflare 会自动重新部署。
+
+**绑定自己的域名**（`workers.dev` 在部分网络下打不开时需要）：Cloudflare 控制台 → Workers & Pages → 选你的 Worker → Settings → Domains & Routes → Add → Custom domain，填一个托管在 Cloudflare 的域名或子域名。
+
+**查看和管理数据库**：控制台 → Storage & Databases → D1，默认名字是 `tg-scout-db`，里面有 Console 可以直接执行 SQL。
+
+### 方式二：命令行部署
+
+适合习惯命令行或想改代码的人。需要 Node.js 18+（推荐 22）。
 
 1. **获取代码并安装依赖**
 
@@ -54,15 +77,7 @@ Cloudflare Cron（每分钟）─▶ Worker ─▶ MTProto（gramjs，经 cloudf
    npm install
    ```
 
-2. **准备配置文件**
-
-   ```bash
-   cp wrangler.example.toml wrangler.toml
-   ```
-
-   `wrangler.toml` 已在 `.gitignore` 中，里面会写你自己的数据库 ID 和域名，不会被提交。
-
-3. **登录 Cloudflare**
+2. **登录 Cloudflare**
 
    ```bash
    npx wrangler login
@@ -73,43 +88,23 @@ Cloudflare Cron（每分钟）─▶ Worker ─▶ MTProto（gramjs，经 cloudf
    - Account → D1 → Edit
    - 如果要绑定自己的域名，再加：Zone → Zone → Read、Zone → Workers Routes → Edit
 
-4. **创建数据库**
-
-   ```bash
-   npx wrangler d1 create tg-scout
-   ```
-
-   把输出里的 `database_id` 填进 `wrangler.toml`。表结构会在第一次请求时自动创建，不需要手动执行 SQL。
-
-5. **设置初始密码**
-
-   ```bash
-   npx wrangler secret put ADMIN_TOKEN
-   ```
-
-   输入一个足够长的随机字符串。这是你第一次登录用的密码，登录后建议在页面里改成自己的。
-
-6. **（可选）绑定自己的域名**
-
-   `workers.dev` 在部分网络环境下无法访问。如果你的域名托管在 Cloudflare，取消 `wrangler.toml` 里 `[[routes]]` 的注释并填入子域名即可：
-
-   ```toml
-   [[routes]]
-   pattern = "tg.example.com"
-   custom_domain = true
-   ```
-
-   绑定自定义域名后，默认的 `workers.dev` 地址会被关闭。想保留的话加一行 `workers_dev = true`。
-
-7. **部署**
+3. **部署**
 
    ```bash
    npx wrangler deploy
    ```
 
-   输出的地址就是你的控制台。
+   第一次部署会自动创建 D1 数据库（名字为 `tg-scout-db`），表结构在第一次请求时自动建好。输出的地址就是你的控制台。
 
-8. **登录并配置**：打开地址，输入第 5 步的密码。之后按下面的[配置](#配置)填写即可。
+4. **设置登录密码**
+
+   ```bash
+   npx wrangler secret put ADMIN_TOKEN
+   ```
+
+   输入一个足够长的随机字符串，这是你第一次登录用的密码，登录后可以在页面里改成自己的。没设置之前无法登录。
+
+5. **（可选）绑定自己的域名**：取消 `wrangler.toml` 里 `[[routes]]` 的注释，改成你的域名，再执行一次 `npx wrangler deploy`。绑定自定义域名后，默认的 `workers.dev` 地址会被关闭，想保留的话加一行 `workers_dev = true`。
 
 ### 本地调试
 
@@ -248,10 +243,15 @@ Telegram 可能终止了这个会话（IP 变化、风控等）。重新登录�
 
 **忘记密码**
 - 配了邮箱：登录页点「忘记密码」。
-- 没配邮箱：清掉库里的密码和两步验证记录，之后用部署时设置的 `ADMIN_TOKEN` 登录：
+- 没配邮箱：清掉库里的密码和两步验证记录，之后用部署时设置的 `ADMIN_TOKEN` 登录。网页方式：控制台 → D1 → `tg-scout-db` → Console，执行下面的 SQL；命令行方式：
+
+  ```sql
+  DELETE FROM settings WHERE k IN ('pw_hash','pw_salt','totp_on','totp_secret');
+  DELETE FROM sessions;
+  ```
 
   ```bash
-  npx wrangler d1 execute tg-scout --remote --command \
+  npx wrangler d1 execute tg-scout-db --remote --command \
     "DELETE FROM settings WHERE k IN ('pw_hash','pw_salt','totp_on','totp_secret'); DELETE FROM sessions;"
   ```
 

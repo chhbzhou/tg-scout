@@ -7,12 +7,11 @@ compatibility_flags = ["nodejs_compat"]
 [triggers]
 crons = ["* * * * *"]
 
+# 数据库在首次部署时自动创建，无需手动填写 ID
 [[d1_databases]]
 binding = "DB"
-database_name = "tg-scout"
-database_id = "<运行 wrangler d1 create tg-scout 后填入>"
 
-# 可选：绑定自己的域名（workers.dev 在部分网络下无法访问）
+# 可选：绑定自己的域名（workers.dev 在部分网络下无法访问），取消注释并改成你的域名
 # [[routes]]
 # pattern = "tg.example.com"
 # custom_domain = true

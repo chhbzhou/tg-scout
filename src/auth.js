@@ -55,10 +55,12 @@ export async function revokeAll(db, keepToken) {
 }
 
 // ---------- 密码 ----------
+const EXAMPLE_TOKEN = "change-me-to-a-long-random-string";
 export async function checkPassword(cfg, env, pw) {
   if (!pw) return false;
   if (cfg.pw_hash) return eq(await sha(cfg.pw_salt + pw), cfg.pw_hash);
-  return !!env.ADMIN_TOKEN && eq(pw, env.ADMIN_TOKEN);
+  if (!env.ADMIN_TOKEN || env.ADMIN_TOKEN === EXAMPLE_TOKEN) return false; // 没改示例密码就不允许登录
+  return eq(pw, env.ADMIN_TOKEN);
 }
 export async function pwRecord(pw) {
   const salt = crypto.randomUUID();

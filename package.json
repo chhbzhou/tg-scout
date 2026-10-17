@@ -5,7 +5,10 @@
   "private": true,
   "type": "module",
   "license": "MIT",
-  "repository": { "type": "git", "url": "git+https://github.com/chhbzhou/tg-scout.git" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chhbzhou/tg-scout.git"
+  },
   "scripts": {
     "dev": "wrangler dev --local",
     "deploy": "wrangler deploy"
@@ -16,5 +19,12 @@
   },
   "devDependencies": {
     "wrangler": "^4.0.0"
+  },
+  "cloudflare": {
+    "bindings": {
+      "ADMIN_TOKEN": {
+        "description": "登录密码：请设置一个足够长的随机字符串，登录后可在设置页修改"
+      }
+    }
   }
 }

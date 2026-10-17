@@ -38,13 +38,36 @@ Cloudflare Cron (every minute) ─▶ Worker ─▶ MTProto (gramjs over cloudfl
 | Needed | Notes |
 | --- | --- |
 | Cloudflare account | Free is enough to start, see [Costs & limits](#costs--limits) |
-| Node.js 18+ (22 recommended) | Only used to run wrangler |
+| GitHub account | One-click deploy only |
+| Node.js 18+ (22 recommended) | Command-line deploy only; not needed for one-click deploy |
 | Telegram `api_id` / `api_hash` | Create at <https://my.telegram.org/apps> |
 | An AI API | Any OpenAI-compatible service, e.g. DeepSeek |
 | A SOCKS5 proxy with a fixed exit IP (strongly recommended) | See [Egress proxy](#egress-proxy) |
 | Resend account (optional) | For password recovery and failure alerts by email |
 
 ## Deploy
+
+### Option 1: one-click deploy from the browser (recommended)
+
+No Node.js and no commands needed.
+
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/chhbzhou/tg-scout)
+
+1. Click **Deploy to Cloudflare** above and sign in to Cloudflare (register first if needed).
+2. Connect and authorize your **GitHub account**. Cloudflare copies this project into a repo under your account.
+3. On the setup page confirm the project name and fill **ADMIN_TOKEN** with your login password: a long random string, never leave the default (the default cannot log in). The database is created automatically.
+4. Click **Create and deploy** and wait; the page shows your URL (like `https://tg-scout.<your-subdomain>.workers.dev`).
+5. Open the URL, sign in with the password from step 3, then configure as [below](#configuration).
+
+Pushing changes to your own GitHub repo redeploys automatically.
+
+**Custom domain** (needed if `workers.dev` is unreachable): Cloudflare dashboard → Workers & Pages → your Worker → Settings → Domains & Routes → Add → Custom domain, using a domain or subdomain hosted on Cloudflare.
+
+**Inspect the database**: dashboard → Storage & Databases → D1, default name `tg-scout-db`; its Console runs SQL directly.
+
+### Option 2: command line
+
+For people who prefer a terminal or want to change the code. Needs Node.js 18+ (22 recommended).
 
 1. **Get the code**
 
@@ -54,15 +77,7 @@ Cloudflare Cron (every minute) ─▶ Worker ─▶ MTProto (gramjs over cloudfl
    npm install
    ```
 
-2. **Create your config**
-
-   ```bash
-   cp wrangler.example.toml wrangler.toml
-   ```
-
-   `wrangler.toml` is git-ignored; it will hold your own database ID and domain.
-
-3. **Sign in to Cloudflare**
+2. **Sign in to Cloudflare**
 
    ```bash
    npx wrangler login
@@ -73,41 +88,23 @@ Cloudflare Cron (every minute) ─▶ Worker ─▶ MTProto (gramjs over cloudfl
    - Account → D1 → Edit
    - For a custom domain also: Zone → Zone → Read, Zone → Workers Routes → Edit
 
-4. **Create the database**
-
-   ```bash
-   npx wrangler d1 create tg-scout
-   ```
-
-   Put the printed `database_id` into `wrangler.toml`. Tables are created automatically on the first request.
-
-5. **Set the initial password**
-
-   ```bash
-   npx wrangler secret put ADMIN_TOKEN
-   ```
-
-   Use a long random string. It is your first login password; change it in the console afterwards.
-
-6. **(Optional) Bind your own domain**
-
-   `workers.dev` is unreachable on some networks. If your domain is on Cloudflare, uncomment `[[routes]]` in `wrangler.toml`:
-
-   ```toml
-   [[routes]]
-   pattern = "tg.example.com"
-   custom_domain = true
-   ```
-
-   With a custom domain the default `workers.dev` address is disabled; add `workers_dev = true` to keep it.
-
-7. **Deploy**
+3. **Deploy**
 
    ```bash
    npx wrangler deploy
    ```
 
-8. **Open the printed URL** and sign in with the password from step 5, then configure as below.
+   The first deploy creates the D1 database automatically (`tg-scout-db`); tables are created on the first request. The printed URL is your console.
+
+4. **Set the login password**
+
+   ```bash
+   npx wrangler secret put ADMIN_TOKEN
+   ```
+
+   Use a long random string. It is your first login password and can be changed in the console. You cannot log in before it is set.
+
+5. **(Optional) custom domain**: uncomment `[[routes]]` in `wrangler.toml`, put in your domain and run `npx wrangler deploy` again. With a custom domain the default `workers.dev` address is disabled; add `workers_dev = true` to keep it.
 
 ### Local development
 
@@ -246,10 +243,15 @@ The red line on the card is the reason. Common ones: dead proxy, terminated sess
 
 **Forgot password**
 - With email configured: use "Forgot password" on the login page.
-- Without email: clear the stored password and two-step records, then sign in with the `ADMIN_TOKEN` from deployment:
+- Without email: clear the stored password and two-step records, then sign in with the `ADMIN_TOKEN` from deployment. In the browser: dashboard → D1 → `tg-scout-db` → Console and run the SQL below; or from the command line:
+
+  ```sql
+  DELETE FROM settings WHERE k IN ('pw_hash','pw_salt','totp_on','totp_secret');
+  DELETE FROM sessions;
+  ```
 
   ```bash
-  npx wrangler d1 execute tg-scout --remote --command \
+  npx wrangler d1 execute tg-scout-db --remote --command \
     "DELETE FROM settings WHERE k IN ('pw_hash','pw_salt','totp_on','totp_secret'); DELETE FROM sessions;"
   ```
 
