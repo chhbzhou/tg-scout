@@ -1,0 +1,20 @@
+{
+  "name": "tg-scout",
+  "version": "0.1.0",
+  "description": "Self-hosted Telegram message filter & analyzer on Cloudflare Workers (keyword + AI rules, read-only)",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "git+https://github.com/chhbzhou/tg-scout.git" },
+  "scripts": {
+    "dev": "wrangler dev --local",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "qrcode-generator": "^2.0.4",
+    "telegram": "^2.26.0"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

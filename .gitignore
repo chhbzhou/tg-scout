@@ -1,0 +1,8 @@
+node_modules
+.wrangler
+.dev.vars
+.cf-token
+.admin-token
+wrangler.toml
+*.log
+.DS_Store

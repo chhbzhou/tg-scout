@@ -1,0 +1,2 @@
+# 本地开发用：复制为 .dev.vars。线上用 wrangler secret put ADMIN_TOKEN 设置
+ADMIN_TOKEN=change-me-to-a-long-random-string

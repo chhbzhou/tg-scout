@@ -1,0 +1,18 @@
+name = "tg-scout"
+main = "src/index.js"
+compatibility_date = "2025-09-01"
+compatibility_flags = ["nodejs_compat"]
+
+# 每分钟唤醒一次，到期的定时策略才会真正执行
+[triggers]
+crons = ["* * * * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "tg-scout"
+database_id = "<运行 wrangler d1 create tg-scout 后填入>"
+
+# 可选：绑定自己的域名（workers.dev 在部分网络下无法访问）
+# [[routes]]
+# pattern = "tg.example.com"
+# custom_domain = true

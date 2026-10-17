@@ -1,0 +1,230 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TGScout</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232b7cff'/%3E%3Cpath d='M7 16l16-7-3 14-5-4-3 3v-5z' fill='%23fff'/%3E%3C/svg%3E">
+<style>
+:root{--hh:55px;--bg:#f4f6fa;--panel:#fff;--panel2:#f0f3f8;--fg:#18202b;--mut:#6a7686;--bd:#e1e6ee;--ac:#2b7cff;--ac2:#e8f0ff;--ok:#1aa561;--bad:#e5484d;--warn:#d98a00;--sh:0 1px 2px rgba(20,30,50,.06),0 6px 20px rgba(20,30,50,.05)}
+@media(prefers-color-scheme:dark){:root{--bg:#0f1318;--panel:#171c23;--panel2:#1d232b;--fg:#e8ecf1;--mut:#8591a1;--bd:#262d37;--ac:#5b97ff;--ac2:#18263f;--ok:#3ecf8e;--bad:#ff6369;--warn:#f0a93b;--sh:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.25)}}
+*{box-sizing:border-box}[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+input,select,textarea{width:100%;background:var(--panel2);border:1px solid var(--bd);border-radius:8px;padding:8px 11px;outline:none;transition:.15s}
+input:focus,select:focus,textarea:focus{border-color:var(--ac);box-shadow:0 0 0 3px var(--ac2)}
+textarea{min-height:120px;resize:vertical}
+.btn{border:1px solid var(--bd);background:var(--panel);border-radius:8px;padding:7px 14px;cursor:pointer;transition:.15s;white-space:nowrap}
+.btn:hover{background:var(--panel2)}.btn.pri{background:var(--ac);border-color:var(--ac);color:#fff}.btn.pri:hover{filter:brightness(1.08)}
+.btn.bad{color:var(--bad)}.btn.sm{padding:4px 10px;font-size:13px}.btn:disabled{opacity:.5;cursor:default}
+/* 认证页 */
+#auth{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px}
+.authbox{width:100%;max-width:340px;background:var(--panel);border:1px solid var(--bd);border-radius:16px;padding:28px 24px;box-shadow:var(--sh);text-align:center}
+.logo{width:48px;height:48px;border-radius:13px;background:var(--ac);display:inline-grid;place-items:center;margin-bottom:10px}
+.authbox input+input{margin-top:10px}.authbox a{display:inline-block;margin-top:12px;font-size:13px}.authbox .err.ok{color:var(--ok)}
+.authbox h1{font-size:20px;margin:0 0 18px}.authbox .err{color:var(--bad);height:20px;margin:8px 0 0;font-size:13px}
+/* 主界面 */
+header{height:var(--hh);position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--bd)}
+.bar{max-width:920px;margin:0 auto;padding:0 16px;height:100%;display:flex;align-items:center;gap:10px}
+.brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:16px}.brand .logo{width:28px;height:28px;border-radius:8px;margin:0}
+.tabs{display:flex;gap:2px;margin-left:12px;flex:1}.tabs button{border:0;background:none;padding:6px 14px;border-radius:8px;color:var(--mut);cursor:pointer;font-weight:500}
+.tabs button.on{background:var(--ac2);color:var(--ac)}.tabs button:hover:not(.on){background:var(--panel2)}
+main{max-width:920px;margin:0 auto;padding:18px 16px 60px}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:99px;font-size:12px;background:var(--panel2);color:var(--mut);border:1px solid var(--bd)}
+.chip.ai{background:#f1e8ff;color:#7a3ff0;border-color:transparent}.chip.kw{background:var(--ac2);color:var(--ac);border-color:transparent}
+@media(prefers-color-scheme:dark){.chip.ai{background:#271a40;color:#b794ff}}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--mut)}.dot.on{background:var(--ok)}.dot.bad{background:var(--bad)}
+.card{background:var(--panel);border:1px solid var(--bd);border-radius:12px;padding:14px 16px;box-shadow:var(--sh)}
+.list{display:grid;gap:10px}
+.srow{display:flex;gap:12px;align-items:center}.srow .main{flex:1;min-width:0}
+.title{font-weight:600;font-size:15px}.t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mut{color:var(--mut)}.sub{font-size:13px;color:var(--mut);margin-top:3px}
+.meta{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px}
+.sw{position:relative;width:38px;height:22px;flex:none}.sw input{opacity:0;width:100%;height:100%;position:absolute;margin:0;cursor:pointer;z-index:1}
+.sw i{position:absolute;inset:0;background:var(--bd);border-radius:99px;transition:.2s}.sw i:after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.sw input:checked+i{background:var(--ok)}.sw input:checked+i:after{transform:translateX(16px)}
+.head{display:flex;align-items:center;gap:10px;margin:0 0 6px;padding:10px 0 8px;position:sticky;top:var(--hh);z-index:4;background:var(--bg)}.head h2{margin:0;font-size:18px;flex:1}
+.empty{text-align:center;padding:48px 0;color:var(--mut)}
+.hit{display:grid;gap:6px}.hit .tx{white-space:pre-wrap;word-break:break-word;background:var(--panel2);border-radius:8px;padding:8px 10px}
+a{color:var(--ac);text-decoration:none}
+.tip{position:relative;display:inline-grid;place-items:center;width:15px;height:15px;margin-left:5px;border-radius:50%;border:1px solid var(--mut);color:var(--mut);font-size:10px;line-height:1;cursor:help;vertical-align:1px;font-style:normal;outline:none}
+.tip:hover,.tip:focus{color:var(--ac);border-color:var(--ac)}
+.tip:after{content:attr(data-tip);position:absolute;left:50%;bottom:calc(100% + 8px);transform:translateX(-50%);width:max-content;max-width:min(260px,70vw);background:var(--fg);color:var(--bg);padding:6px 10px;border-radius:7px;font-size:12px;line-height:1.5;font-weight:400;text-align:left;white-space:normal;opacity:0;pointer-events:none;transition:.15s;z-index:30}
+.tip:hover:after,.tip:focus:after{opacity:1}a:hover{text-decoration:underline}
+/* 抽屉 */
+.mask{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:20;opacity:0;pointer-events:none;transition:.2s}.mask.on{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(580px,100%);max-width:100vw;background:var(--panel);z-index:21;transform:translateX(100%);transition:.25s;display:flex;flex-direction:column;box-shadow:-10px 0 40px rgba(0,0,0,.2)}
+.drawer.on{transform:none}.dh{padding:14px 18px;border-bottom:1px solid var(--bd);display:flex;align-items:center}.dh b{flex:1;font-size:16px}
+.db{padding:16px 18px;overflow-y:auto;overflow-x:hidden;flex:1;display:grid;grid-template-columns:minmax(0,1fr);gap:14px;align-content:start}.db>*{min-width:0}.df{padding:12px 18px;border-top:1px solid var(--bd);display:flex;gap:8px;justify-content:flex-end}
+.fld>label{display:block;font-size:13px;color:var(--mut);margin-bottom:5px}
+.seg{display:flex;background:var(--panel2);border-radius:9px;padding:3px;border:1px solid var(--bd)}.seg button{flex:1;border:0;background:none;padding:6px;border-radius:7px;cursor:pointer;color:var(--mut)}.seg button.on{background:var(--panel);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.15);font-weight:600}
+.tags{display:flex;flex-wrap:wrap;gap:6px;background:var(--panel2);border:1px solid var(--bd);border-radius:8px;padding:6px}.tags:focus-within{border-color:var(--ac);box-shadow:0 0 0 3px var(--ac2)}
+.tags input{flex:1;min-width:120px;border:0;background:none;padding:3px 5px;box-shadow:none!important}.tg{background:var(--ac2);color:var(--ac);border-radius:6px;padding:2px 4px 2px 9px;display:inline-flex;gap:4px;align-items:center}.tg b{cursor:pointer;font-weight:400;padding:0 4px}
+.pick{border:1px solid var(--bd);border-radius:8px;overflow:hidden}.pick input{border:0;border-bottom:1px solid var(--bd);border-radius:0;box-shadow:none!important}
+.pick .ls{max-height:220px;overflow:auto}.pick label{display:flex;gap:8px;align-items:center;padding:6px 10px;cursor:pointer}.pick label:hover{background:var(--panel2)}.pick label input{width:auto;border:0;padding:0;flex:none}.pick label .t{min-width:0}.pick label .chip{flex:none}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.sec{margin-bottom:14px}.sec h3{margin:0 0 12px;font-size:15px}.sec .g{display:grid;gap:12px}
+#toast{position:fixed;left:50%;bottom:20px;transform:translate(-50%,30px);background:var(--fg);color:var(--bg);padding:8px 16px;border-radius:9px;opacity:0;transition:.25s;z-index:50;max-width:90vw}#toast.on{opacity:1;transform:translate(-50%,0)}
+@media(max-width:560px){.tabs{margin-left:4px}.tabs button{padding:6px 9px}.two{grid-template-columns:1fr}.brand span{display:none}}
+</style></head><body>
+<section id="auth" hidden>
+<form class="authbox" id="af" onsubmit="return login(event)"><div class="logo"><svg width="26" height="26" viewBox="0 0 32 32"><path d="M6 16l19-8-3.4 16-6-4.6-3.4 3.4v-5.6z" fill="#fff"/></svg></div><h1>TGScout</h1>
+ <input id="tok" type="password" placeholder="密码" autocomplete="current-password" autofocus>
+ <input id="otp" inputmode="numeric" maxlength="6" placeholder="动态验证码" autocomplete="one-time-code" hidden>
+ <button class="btn pri" id="go" style="width:100%;margin-top:12px;padding:9px">进入</button><div class="err" id="aerr"></div>
+ <a id="fg" href="#" hidden onclick="forgot();return false">忘记密码</a></form>
+<form class="authbox" id="rf" hidden onsubmit="return doReset(event)"><div class="logo"><svg width="26" height="26" viewBox="0 0 32 32"><path d="M6 16l19-8-3.4 16-6-4.6-3.4 3.4v-5.6z" fill="#fff"/></svg></div><h1>重设密码</h1>
+ <input id="r_code" inputmode="numeric" maxlength="6" placeholder="邮件验证码" autocomplete="one-time-code">
+ <input id="r_pw" type="password" placeholder="新密码（至少 8 位）" autocomplete="new-password">
+ <input id="r_pw2" type="password" placeholder="确认新密码" autocomplete="new-password">
+ <button class="btn pri" id="rgo" style="width:100%;margin-top:12px;padding:9px">重设</button><div class="err" id="rerr"></div>
+ <a href="#" onclick="showAuth();return false">返回登录</a></form>
+</section>
+<section id="app" hidden>
+ <header><div class="bar"><div class="brand"><div class="logo"><svg width="18" height="18" viewBox="0 0 32 32"><path d="M6 16l19-8-3.4 16-6-4.6-3.4 3.4v-5.6z" fill="#fff"/></svg></div><span>TGScout</span></div>
+  <div class="tabs" id="tabs"><button data-t="s" class="on">策略</button><button data-t="h">命中</button><button data-t="c">设置</button></div>
+  <span class="chip" id="acc"><i class="dot"></i><span>—</span></span><button class="btn sm" id="runall">运行</button><button class="btn sm" onclick="logout()">退出</button></div></header>
+ <main id="v"></main>
+</section>
+<div class="mask" id="mask" onclick="closeD()"></div><aside class="drawer" id="dw"></aside><div id="toast"></div>
+<script>
+const $=(s,r=document)=>r.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let tab='s',dialogs=null,S=[],ST=null,editing=null,HS=[],SS=null,US=null,ver=0,dirty=false;
+const tok=()=>{try{return localStorage.getItem('tgs_tok')||''}catch{return''}};
+function toast(t,sticky){const m=$('#toast');m.textContent=t;m.classList.add('on');clearTimeout(toast.t);if(!sticky)toast.t=setTimeout(()=>m.classList.remove('on'),2800)}
+async function api(m,p,b,t=tok()){const r=await fetch('/api/'+p,{method:m,headers:{authorization:'Bearer '+t,'content-type':'application/json'},body:b?JSON.stringify(b):undefined});
+ if(r.status===401){const e=new Error('401');e.auth=true;throw e}const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||r.status);return j}
+const G=f=>async(...a)=>{try{return await f(...a)}catch(e){if(e.auth)return showAuth();toast(e.message)}};
+async function pub(p,b){const r=await fetch('/api/'+p,{method:b?'POST':'GET',headers:{'content-type':'application/json'},body:b?JSON.stringify(b):undefined});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||r.status);return j}
+async function showAuth(msg){$('#app').hidden=true;$('#auth').hidden=false;$('#af').hidden=false;$('#rf').hidden=true;$('#aerr').className='err';$('#aerr').textContent=msg||'';
+ try{const i=await pub('auth/info');$('#otp').hidden=!i.totp;$('#fg').hidden=!i.mail}catch{}$('#tok').focus()}
+async function login(ev){ev.preventDefault();const pw=$('#tok').value;if(!pw)return false;$('#go').disabled=true;
+ try{const r=await pub('auth/login',{password:pw,code:$('#otp').value.trim()});localStorage.setItem('tgs_tok',r.token);$('#tok').value='';$('#otp').value='';ST=await api('GET','settings');enter()}
+ catch(e){$('#aerr').className='err';$('#aerr').textContent=e.message}finally{$('#go').disabled=false}return false}
+async function logout(){try{await api('POST','auth/logout',{})}catch{}try{localStorage.removeItem('tgs_tok')}catch{}location.reload()}
+async function forgot(){$('#aerr').className='err';$('#aerr').textContent='发送中…';
+ try{await pub('auth/forgot',{});$('#af').hidden=true;$('#rf').hidden=false;$('#rerr').className='err ok';$('#rerr').textContent='验证码已发送到邮箱';$('#r_code').focus()}catch(e){$('#aerr').textContent=e.message}}
+async function doReset(ev){ev.preventDefault();const a=$('#r_pw').value,b=$('#r_pw2').value,er=$('#rerr');er.className='err';
+ if(a.length<8){er.textContent='新密码至少 8 位';return false}if(a!==b){er.textContent='两次输入不一致';return false}
+ $('#rgo').disabled=true;try{await pub('auth/reset',{code:$('#r_code').value.trim(),password:a});await showAuth('密码已重设，请登录');$('#aerr').className='err ok'}catch(e){er.textContent=e.message}finally{$('#rgo').disabled=false}return false}
+function enter(){$('#auth').hidden=true;$('#app').hidden=false;paint();prefetch()}
+async function boot(){if(!tok())return showAuth();try{ST=await api('GET','settings');enter()}catch(e){e.auth?showAuth():showAuth('连接失败')}}
+
+$('#tabs').onclick=e=>{const t=e.target.dataset?.t;if(!t)return;if(dirty&&tab==='c'&&!confirm('有未保存的修改，放弃？'))return;dirty=false;tab=t;[...$('#tabs').children].forEach(b=>b.classList.toggle('on',b.dataset.t===t));render()};
+const ago=ts=>{if(!ts)return'从未';const d=Date.now()/1000-ts;return d<90?'刚刚':d<3600?Math.round(d/60)+' 分钟前':d<86400?Math.round(d/3600)+' 小时前':new Date(ts*1000).toLocaleDateString()};
+function paintAcc(){const a=$('#acc');a.innerHTML='<i class="dot '+(ST.logged_in?'on':'bad')+'"></i><span>'+(ST.logged_in?esc(ST.me?.name||'已登录'):'未登录')+'</span>'}
+const load={
+ st:()=>api('GET','settings').then(x=>ST=x),
+ ss:()=>api('GET','strategies').then(x=>S=x),
+ hs:()=>api('GET','hits').then(x=>HS=x),
+ us:()=>api('GET','usage').then(x=>US=x)};
+function paint(){if(!ST)return;paintAcc();({s:viewS,h:viewH,c:viewC})[tab]();if(tab==='c'){initT();bindDirty()}}
+// 先用缓存立刻画出来，再后台刷新对应数据
+const render=G(async(fresh=true)=>{const my=++ver;paint();if(!fresh)return;
+ const need={s:['ss','st'],h:['hs','ss','st'],c:['st','us']}[tab];
+ await Promise.all(need.map(k=>load[k]()));if(my===ver&&!(tab==='c'&&dirty))paint()});
+const prefetch=()=>Promise.all([load.ss(),load.hs()]).then(()=>paint()).catch(e=>{if(e.auth)showAuth()});
+$('#runall').onclick=G(async()=>{const b=$('#runall');b.disabled=true;toast('运行中，请稍候…',true);try{const r=await api('POST','run');toast(r.skipped||('已运行 '+(r.ran||0)+' 个策略'))}finally{b.disabled=false}render()});
+
+function viewS(){
+ $('#v').innerHTML='<div class="head"><h2>策略</h2><button class="btn pri" onclick="edit()">新增策略</button></div><div class="list">'+
+ (S.map(s=>{const sc=s.chats.length?s.chats.length+' 个会话':'全部会话';
+  return '<div class="card"><div class="srow">'+(s.interval_min===0?'':'<label class="sw"><input type="checkbox" '+(s.enabled?'checked':'')+' onchange="toggle('+s.id+',this.checked)"><i></i></label>')+
+  '<div class="main"><div class="title t">'+esc(s.name)+'</div><div class="sub t">'+esc(s.type==='keyword'?s.keywords.join('  ·  '):s.prompt)+'</div>'+
+  '<div class="meta"><span class="chip '+(s.type==='ai'?'ai':'kw')+'">'+(s.type==='ai'?'AI 分析':'关键字')+'</span>'+(s.interval_min===0?'<span class="chip">手动 · 最近 '+s.range_n+' 条</span>':'<span class="chip">每 '+s.interval_min+' 分钟</span>')+'<span class="chip">'+sc+'</span><span class="chip"><i class="dot '+(s.last_status==='ok'?'on':s.last_status==='err'?'bad':'')+'"></i>上次 '+ago(s.last_run)+'</span></div>'+(s.last_status==='err'?'<div class="sub t" style="color:var(--bad)" title="'+esc(s.last_err)+'">失败：'+esc(s.last_err)+(s.fail_n>1?'（连续 '+s.fail_n+' 次）':'')+'</div>':'')+'</div>'+
+  '<div style="display:grid;gap:6px"><button class="btn sm" onclick="runOne('+s.id+',this)">运行</button><button class="btn sm" onclick="edit('+s.id+')">编辑</button></div></div></div>'}).join('')||'<div class="empty">暂无策略</div>')+'</div>';
+}
+const toggle=G(async(id,on)=>{const s=S.find(x=>x.id===id);await api('PUT','strategies/'+id,{...s,enabled:on});s.enabled=on;toast(on?'已启用':'已停用')});
+const runOne=G(async(id,btn)=>{if(btn){btn.disabled=true;btn.textContent='运行中'}toast('运行中，请稍候…',true);let r;try{r=await api('POST','strategies/'+id+'/run')}finally{if(btn){btn.disabled=false;btn.textContent='运行'}}
+ if(r.results){openD('<div class="dh"><b>任务结果</b><button class="btn sm" onclick="closeD()">关闭</button></div><div class="db">'+r.results.map(x=>'<div class="fld"><label>'+esc(x.title)+(x.count?' · '+x.count+' 条':'')+'</label><div class="hit"><div class="tx" style="white-space:pre-wrap;word-break:break-word">'+esc(x.text)+'</div></div>'+(x.usage?'<div class="sub" style="margin-top:6px">输入 '+nf(x.usage.in)+' · 输出 '+nf(x.usage.out)+' · 消耗 '+nf(x.usage.tot)+' tokens</div>':'')+'</div>').join('')+'</div><div class="df"><button class="btn" onclick="copyHit()">复制</button></div>');window._hitText=r.results.map(x=>(r.results.length>1?'【'+x.title+'】\n':'')+x.text).join('\n\n');toast('完成');render(false);return}const x=r.report?.[0];toast(x?(x.err?x.err:'新消息 '+x.new+' 条，命中 '+x.hits+' 条'):(r.error||r.skipped||'无变化'));render()});
+
+function openD(html){$('#dw').innerHTML=html;$('#mask').classList.add('on');$('#dw').classList.add('on')}
+function closeD(){$('#mask').classList.remove('on');$('#dw').classList.remove('on')}
+const edit=G(async id=>{
+ const s=id?S.find(x=>x.id===id):{name:'',type:'keyword',enabled:true,chats:[],keywords:[],match_mode:'any',prompt:'',interval_min:5};
+ editing={id:id||0,type:s.type,manual:s.type==='ai'&&s.interval_min===0,kws:[...s.keywords],sel:new Set(s.chats)};
+ openD('<div class="dh"><b>'+(id?'编辑策略':'新增策略')+'</b><button class="btn sm" onclick="closeD()">关闭</button></div><div class="db">'+
+ '<div class="fld"><label>名称</label><input id="f_name" value="'+esc(s.name)+'"></div>'+
+ '<div class="fld"><label>类型</label><div class="seg" id="seg"><button data-v="keyword">关键字匹配</button><button data-v="ai">AI 分析匹配</button></div></div>'+
+ '<div class="fld ai"><label>运行方式</label><div class="seg" id="seg2"><button data-m="0">定时</button><button data-m="1">手动</button></div></div>'+
+ '<div class="fld sch"><label>频率（分钟）</label><input id="f_int" type="number" min="1" max="1440" value="'+s.interval_min+'"></div>'+
+ '<div class="fld kw"><label>关键字</label><div class="tags" id="tags"></div></div>'+
+ '<div class="fld kw"><label>匹配方式</label><select id="f_mode"><option value="any">任一命中</option><option value="all">全部命中</option><option value="regex">正则</option></select></div>'+
+ '<div class="fld mn"><label>读取最近消息条数</label><input id="f_rn" type="number" min="1" max="200" value="'+(s.range_n||50)+'"></div>'+
+ '<div class="fld mn"><label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input id="f_push" type="checkbox" style="width:auto"'+(s.push?' checked':'')+'>结果推送到目标会话</label></div>'+
+ '<div class="fld ai"><label>提示词</label><textarea id="f_pr">'+esc(s.prompt)+'</textarea></div>'+
+ '<div class="fld"><label>会话 <span id="cn"></span></label><div class="pick"><input id="q" placeholder="搜索会话"><div class="ls" id="ls"><div class="empty" style="padding:16px">加载中…</div></div></div></div>'+
+ '</div><div class="df">'+(id?'<button class="btn bad" style="margin-right:auto" onclick="del('+id+')">删除</button>':'')+'<button class="btn" onclick="closeD()">取消</button><button class="btn pri" onclick="save()">保存</button></div>');
+ $('#f_mode').value=s.match_mode;
+ $('#seg').onclick=e=>{if(e.target.dataset.v){editing.type=e.target.dataset.v;typeUI()}};
+ $('#seg2').onclick=e=>{if(e.target.dataset.m!=null){editing.manual=e.target.dataset.m==='1';typeUI()}};typeUI();tagsUI();
+ const t=$('#tags');t.onclick=e=>{if(e.target.dataset.x!=null){editing.kws.splice(+e.target.dataset.x,1);tagsUI()}else $('#ti')?.focus()};
+ loadList();
+});
+function typeUI(){const t=editing.type,ai=t==='ai',m=ai&&editing.manual;[...$('#seg').children].forEach(b=>b.classList.toggle('on',b.dataset.v===t));
+ [...$('#seg2').children].forEach(b=>b.classList.toggle('on',(b.dataset.m==='1')===!!editing.manual));
+ document.querySelectorAll('#dw .kw').forEach(e=>e.hidden=ai);document.querySelectorAll('#dw .ai').forEach(e=>e.hidden=!ai);
+ document.querySelectorAll('#dw .sch').forEach(e=>e.hidden=m);document.querySelectorAll('#dw .mn').forEach(e=>e.hidden=!m)}
+function tagsUI(){$('#tags').innerHTML=editing.kws.map((k,i)=>'<span class="tg">'+esc(k)+'<b data-x="'+i+'">×</b></span>').join('')+'<input id="ti" placeholder="'+(editing.kws.length?'':'输入后回车')+'">';
+ const ti=$('#ti');ti.onkeydown=e=>{if((e.key==='Enter'||e.key===',')&&ti.value.trim()){e.preventDefault();editing.kws.push(ti.value.trim().replace(/,$/,''));tagsUI();$('#ti').focus()}else if(e.key==='Backspace'&&!ti.value&&editing.kws.length){editing.kws.pop();tagsUI();$('#ti').focus()}};
+ ti.onblur=()=>{if(ti.value.trim()){editing.kws.push(ti.value.trim());tagsUI()}}}
+function cn(){$('#cn').textContent=editing.sel.size?'· 已选 '+editing.sel.size:'· 全部'}
+const loadList=G(async()=>{cn();if(!ST.logged_in){$('#ls').innerHTML='<div class="empty" style="padding:16px">未登录</div>';return}
+ dialogs=dialogs||await api('GET','tg/dialogs');const draw=()=>{const q=$('#q').value.toLowerCase();
+  $('#ls').innerHTML=dialogs.filter(d=>!q||d.title.toLowerCase().includes(q)).map(d=>'<label><input type="checkbox" value="'+d.id+'"'+(editing.sel.has(d.id)?' checked':'')+'><span class="t" style="flex:1">'+esc(d.title||d.id)+'</span><span class="chip">'+({user:'私聊',group:'群组',channel:'频道'}[d.kind]||'其他')+'</span></label>').join('')||'<div class="empty" style="padding:16px">无结果</div>'};
+ draw();$('#q').oninput=draw;$('#ls').onchange=e=>{e.target.checked?editing.sel.add(e.target.value):editing.sel.delete(e.target.value);cn()}});
+const save=G(async()=>{const b={name:$('#f_name').value.trim(),type:editing.type,interval_min:(editing.type==='ai'&&editing.manual)?0:+$('#f_int').value,chats:[...editing.sel],keywords:editing.kws,match_mode:$('#f_mode').value,prompt:$('#f_pr').value,range_n:+$('#f_rn').value,push:$('#f_push').checked,enabled:true};
+ if(editing.id)b.enabled=S.find(x=>x.id===editing.id).enabled;
+ if(!b.name)throw new Error('请填名称');if(b.type==='keyword'&&!b.keywords.length)throw new Error('请添加关键字');if(b.type==='ai'&&!b.prompt.trim())throw new Error('请填提示词');
+ if(b.interval_min===0&&!b.chats.length)throw new Error('手动运行需要选择会话');
+ if(b.interval_min!==0&&!(Number.isInteger(b.interval_min)&&b.interval_min>=1&&b.interval_min<=1440))throw new Error('频率需为 1–1440 分钟');
+ editing.id?await api('PUT','strategies/'+editing.id,b):await api('POST','strategies',b);closeD();toast('已保存');render()});
+const del=G(async id=>{if(!confirm('删除该策略及其命中记录？'))return;await api('DELETE','strategies/'+id);closeD();render()});
+
+function viewH(){
+ const ss=S;window._hits=HS;
+ $('#v').innerHTML='<div class="head"><h2>命中</h2><select id="hf" style="width:auto;max-width:50%" onchange="hdraw()"><option value="">全部策略</option>'+ss.map(s=>'<option value="'+s.id+'">'+esc(s.name)+'</option>').join('')+'</select><button class="btn bad" onclick="clr()">清空</button></div><div class="list" id="hl"></div>';hdraw()}
+function hdraw(){const f=$('#hf').value;$('#hl').innerHTML=_hits.filter(h=>!f||String(h.strategy_id)===f).map(h=>'<div class="card" style="cursor:pointer" onclick="showHit('+h.id+')"><div class="srow"><b class="t main">'+esc(h.strategy_name)+' <span class="mut" style="font-weight:400">· '+esc(h.chat)+'</span></b><span class="mut">'+ago(h.ts)+'</span></div><div class="sub t">'+esc(h.preview.replace(/\s+/g,' '))+'</div><div class="meta"><span class="chip">'+esc(h.reason)+'</span>'+(h.len>100?'<span class="chip">'+h.len+' 字</span>':'')+(h.ttot?'<span class="chip">输入 '+nf(h.tin)+' · 输出 '+nf(h.tout)+' · 消耗 '+nf(h.ttot)+'</span>':'')+'</div></div>').join('')||'<div class="empty">暂无记录</div>'}
+const showHit=G(async id=>{const h=await api('GET','hits/'+id);openD('<div class="dh"><b class="t">'+esc(h.strategy_name)+'</b><button class="btn sm" onclick="closeD()">关闭</button></div><div class="db"><div class="meta" style="margin:0"><span class="chip">'+esc(h.chat)+'</span><span class="chip">'+new Date(h.ts*1000).toLocaleString()+'</span><span class="chip">'+esc(h.reason)+'</span>'+(h.link?'<a href="'+esc(h.link)+'" target="_blank" rel="noreferrer">原文 ↗</a>':'')+'</div><div class="tx" style="white-space:pre-wrap;word-break:break-word;background:var(--panel2);border-radius:8px;padding:12px">'+esc(h.text)+'</div>'+(h.ttot?'<div class="sub">输入 '+nf(h.tin)+' · 输出 '+nf(h.tout)+' · 消耗 '+nf(h.ttot)+' tokens</div>':'')+'</div><div class="df"><button class="btn bad" style="margin-right:auto" onclick="delHit('+h.id+')">删除</button><button class="btn" onclick="copyHit()">复制</button></div>');window._hitText=h.text});
+const copyHit=()=>navigator.clipboard?.writeText(window._hitText||'').then(()=>toast('已复制'),()=>toast('复制失败'));
+const delHit=G(async id=>{await api('DELETE','hits/'+id);closeD();HS=HS.filter(x=>x.id!==id);_hits=HS;hdraw();toast('已删除')});
+const clr=G(async()=>{if(!confirm('清空全部命中记录？'))return;await api('POST','hits/clear');render()});
+
+function viewC(){
+ const s=ST.settings;const f=(k,l,t='text',ph='')=>'<div class="fld"><label>'+l+'</label><input id="c_'+k+'" type="'+t+'" placeholder="'+ph+'" value="'+esc(s[k])+'" autocomplete="off"></div>';
+ $('#v').innerHTML='<div class="head"><h2>设置</h2><button class="btn" id="savebtn" onclick="saveC()" disabled>保存</button></div>'+
+ '<div class="card sec"><div class="srow" style="margin-bottom:12px"><h3 class="main" style="margin:0">AI</h3><button class="btn sm" id="atest" onclick="testAI()">测试</button></div><div class="g">'+f('ai_base','接口地址','text','https://api.openai.com/v1')+'<div class="two">'+f('ai_model','模型')+f('ai_key','密钥','password')+'</div><div id="usage">'+usageHtml()+'</div></div></div>'+
+ '<div class="card sec"><div class="srow" style="margin-bottom:12px"><h3 class="main" style="margin:0">Telegram</h3><a href="https://my.telegram.org/apps" target="_blank" rel="noopener noreferrer">创建 api_id ↗</a></div><div class="g"><div class="two">'+f('tg_api_id','api_id')+f('tg_api_hash','api_hash','password')+'</div>'+'<div class="fld"><label>出口代理</label><div style="display:flex;gap:8px"><input id="c_proxy" placeholder="socks5://用户:密码@主机:端口" value="'+esc(s.proxy)+'" autocomplete="off"><button class="btn" id="ptest" onclick="testProxy()">测试</button></div></div>'+'<div class="fld"><label>推送到</label><div style="display:grid;gap:8px"><select id="c_tmode" onchange="tmode()"><option value="me">已保存消息</option><option value="custom">自定义</option></select><input id="c_target_chat" placeholder="@频道名 / 会话 id" autocomplete="off" hidden></div></div></div></div>'+
+ '<div class="card sec"><h3>记录</h3><div class="g"><div class="fld"><label>保留天数（0 为不清理）</label><input id="c_hits_days" type="number" min="0" max="3650" value="'+esc(s.hits_days||'30')+'"></div></div></div>'+
+ '<div class="card sec"><h3>访问密码</h3><div class="g"><div class="two"><div class="fld"><label>新密码</label><input id="p1" type="password" autocomplete="new-password" placeholder="至少 8 位"></div><div class="fld"><label>确认密码</label><input id="p2" type="password" autocomplete="new-password"></div></div><div><button class="btn pri" onclick="setPw()">修改密码</button></div></div></div>'+
+ '<div class="card sec"><h3>两步验证</h3><div id="totpbox">'+totpHtml()+'</div></div>'+
+ '<div class="card sec"><div class="srow" style="margin-bottom:12px"><h3 class="main" style="margin:0">邮箱找回</h3><span class="chip" id="mchip"><i class="dot '+(ST.mail_on?'on':'')+'"></i>'+(ST.mail_on?'已启用':'未启用')+'</span><button class="btn sm" id="mtest" onclick="testMail()">发送测试邮件</button></div><div class="g">'+f('resend_key','<a href="https://resend.com/api-keys" target="_blank" rel="noopener noreferrer">Resend API Key ↗</a>','password')+'<div class="two">'+f('notify_email','收件邮箱<i class="tip" tabindex="0" data-tip="未验证域名时，只能填注册 Resend 账号用的邮箱">i</i>')+f('mail_from','发件人（可选）<i class="tip" tabindex="0" data-tip="验证自己的域名后才能改，格式：名称 &lt;noreply@你的域名&gt;">i</i>','text','TGScout <onboarding@resend.dev>')+'</div></div></div>'+
+ '<div class="card sec"><div class="srow"><h3 class="main" style="margin:0">账号</h3>'+(ST.logged_in?'<span class="chip"><i class="dot on"></i>'+esc(ST.me?.name||'')+(ST.me?.username?' @'+esc(ST.me.username):'')+'</span><button class="btn sm bad" onclick="tgout()">退出账号</button>':'<span class="chip"><i class="dot bad"></i>未登录</span>')+'</div>'+
+ (ST.logged_in?'':'<div class="g" style="margin-top:14px"><div class="fld"><label>手机号</label><div style="display:flex;gap:8px"><input id="l_cc" placeholder="+86" inputmode="tel" autocomplete="tel-country-code" style="width:84px;flex:none"><input id="l_ph" placeholder="手机号码" inputmode="tel" autocomplete="tel-national"><button class="btn" id="send" onclick="sendCode()">发送验证码</button></div></div><div class="two"><div class="fld"><label>验证码</label><input id="l_code" autocomplete="one-time-code"></div><div class="fld"><label>二步密码</label><input id="l_pw" type="password"></div></div><div><button class="btn pri" onclick="signIn()">登录</button></div></div>')+'</div>'}
+const testAI=G(async()=>{const b=$('#atest');b.disabled=true;b.textContent='测试中';try{const r=await api('POST','ai/test',{ai_base:$('#c_ai_base').value,ai_model:$('#c_ai_model').value,ai_key:$('#c_ai_key').value});
+ toast('已回复（'+r.ms+'ms）：'+(r.reply||'（空）'));load.us().then(()=>{const e=$('#usage');if(e)e.innerHTML=usageHtml()}).catch(()=>{})}finally{b.disabled=false;b.textContent='测试'}});
+const testProxy=G(async()=>{const b=$('#ptest');b.disabled=true;b.textContent='测试中';try{const r=await api('POST','proxy/test',{proxy:$('#c_proxy').value.trim()});
+ toast('出口 '+(r.query||'?')+' · '+[r.country,r.city].filter(Boolean).join(' ')+' · 连 Telegram '+r.tg_ms+'ms')}finally{b.disabled=false;b.textContent='测试'}});
+function nf(n){return Number(n||0).toLocaleString()}
+function usageHtml(){const u=US;if(!u||!u.total?.tot)return '';const row=(l,x)=>'<tr><td class="mut">'+l+'</td><td>'+(x?nf(x.in):'—')+'</td><td>'+(x?nf(x.out):'—')+'</td><td><b>'+(x?nf(x.tot):'—')+'</b></td></tr>';
+ return '<div style="display:flex;gap:12px;align-items:flex-end;margin-top:6px"><table style="flex:1;border-collapse:collapse"><thead><tr class="mut" style="text-align:left;font-size:12px"><th style="width:25%;font-weight:400"></th><th style="font-weight:400">输入</th><th style="font-weight:400">输出</th><th style="font-weight:400">消耗</th></tr></thead><tbody style="font-variant-numeric:tabular-nums">'+row('今日',u?.today)+row('累计',u?.total)+'</tbody></table><button class="btn sm bad" onclick="resetUsage()">重新计数</button></div>'}
+const resetUsage=G(async()=>{if(!confirm('清零今日和累计的 token 统计？'))return;await api('POST','usage/reset');US=null;const e=$('#usage');if(e)e.innerHTML='';toast('已重新计数')});
+function totpHtml(){if(ST.totp_on)return '<div class="srow"><span class="chip"><i class="dot on"></i>已开启</span><span class="main"></span><input id="t_code" inputmode="numeric" maxlength="6" placeholder="动态码" style="width:130px"><button class="btn sm bad" onclick="totpOff()">关闭</button></div>';
+ return '<div class="srow"><span class="chip"><i class="dot"></i>未开启</span><span class="main"></span><button class="btn sm" onclick="totpSetup()">开启</button></div>'}
+const totpSetup=G(async()=>{const r=await api('POST','totp/setup',{});$('#totpbox').innerHTML='<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center"><div style="width:168px;height:168px;background:#fff;border-radius:8px;padding:6px;flex:none">'+r.svg+'</div><div style="flex:1;min-width:220px;display:grid;gap:8px"><div class="mut">密钥</div><code style="word-break:break-all;user-select:all">'+esc(r.secret)+'</code><input id="t_code" inputmode="numeric" maxlength="6" placeholder="输入 6 位动态码"><div style="display:flex;gap:8px"><button class="btn pri" onclick="totpOn()">确认开启</button><button class="btn" onclick="render()">取消</button></div></div></div>'});
+const totpOn=G(async()=>{await api('POST','totp/enable',{code:$('#t_code').value.trim()});toast('两步验证已开启');render()});
+const totpOff=G(async()=>{await api('POST','totp/disable',{code:$('#t_code').value.trim()});toast('两步验证已关闭');render()});
+const testMail=G(async()=>{const b=$('#mtest');b.disabled=true;b.textContent='发送中';try{await saveC(true);await api('POST','mail/test',{});toast('测试邮件已发送')}finally{b.disabled=false;b.textContent='发送测试邮件'}});
+function tmode(){const c=$('#c_tmode').value==='custom';$('#c_target_chat').hidden=!c;if(c)$('#c_target_chat').focus()}
+const saveC=G(async(quiet)=>{const b={};['ai_base','ai_key','ai_model','tg_api_id','tg_api_hash','proxy','hits_days','resend_key','notify_email','mail_from'].forEach(k=>b[k]=$('#c_'+k).value.trim());
+ if($('#c_tmode').value==='custom'){b.target_chat=$('#c_target_chat').value.trim();if(!b.target_chat)throw new Error('请填推送目标')}else b.target_chat='me';await api('PUT','settings',b);
+ ST=await api('GET','settings');setDirty(false);
+ ['ai_key','tg_api_hash','resend_key'].forEach(k=>{const e=$('#c_'+k);if(e)e.value=ST.settings[k]});
+ paintMail();if(quiet!==true)toast('已保存')});
+function setDirty(d){dirty=d;const b=$('#savebtn');if(b){b.disabled=!d;b.classList.toggle('pri',d)}}
+function bindDirty(){const v=$('#v');const h=e=>{if(/^c_/.test(e.target.id))setDirty(true)};v.oninput=h;v.onchange=h}
+function paintMail(){const c=$('#mchip');if(c)c.innerHTML='<i class="dot '+(ST.mail_on?'on':'')+'"></i>'+(ST.mail_on?'已启用':'未启用')}
+function initT(){const v=ST.settings.target_chat;const c=v&&v!=='me';$('#c_tmode').value=c?'custom':'me';$('#c_target_chat').value=c?v:'';tmode()}
+const setPw=G(async()=>{const a=$('#p1').value,b=$('#p2').value;if(a.length<8)throw new Error('新密码至少 8 位');if(a!==b)throw new Error('两次输入不一致');
+ await api('POST','password',{new:a});$('#p1').value=$('#p2').value='';toast('密码已修改，其他设备已退出')});
+const sendCode=G(async()=>{const cc=$('#l_cc').value.replace(/\D/g,''),ph=$('#l_ph').value.replace(/\D/g,'');if(!cc||!ph)throw new Error('请填区号和手机号');
+ const b=$('#send');b.disabled=true;b.textContent='发送中';try{await saveC(true);await api('POST','tg/send-code',{phone:'+'+cc+ph});toast('验证码已发送，请查看 Telegram 官方对话')}finally{b.disabled=false;b.textContent='发送验证码'}});
+const signIn=G(async()=>{const r=await api('POST','tg/sign-in',{code:$('#l_code').value.trim(),password:$('#l_pw').value});if(r.need_password)return toast('需要二步密码');dialogs=null;toast('已登录');render()});
+const tgout=G(async()=>{if(!confirm('退出账号？'))return;await api('POST','tg/logout');dialogs=null;render()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeD()});
+boot();
+</script></body></html>
