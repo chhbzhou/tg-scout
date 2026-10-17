@@ -1,4 +1,5 @@
-import { listStrategies, getSettings, addUsage } from "./db.js";
+import { listStrategies, getSettings, addUsage, listChannels } from "./db.js";
+import { pushAll } from "./notify.js";
 import { withClient, listDialogs } from "./tg.js";
 import { keywordMatch, aiMatch, aiTask } from "./match.js";
 import { mailOn, sendMail } from "./auth.js";
@@ -44,7 +45,7 @@ export async function runDue(env, { force = false, only = null } = {}) {
   try {
   await withClient(cfg, async (c) => {
     const dialogs = await listDialogs(c); // 同时填充实体缓存
-    const target = cfg.target_chat || "me";
+    const channels = await listChannels(db);
     for (const s of due) {
       const r = { id: s.id, new: 0, hits: 0, err: null };
       try {
@@ -81,8 +82,13 @@ export async function runDue(env, { force = false, only = null } = {}) {
           const fu = tok(f.usage);
           await db.prepare("INSERT INTO hits(strategy_id,strategy_name,chat,msg_id,sender,text,reason,link,ts,tin,tout,ttot) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)")
             .bind(s.id, s.name, f.title, f.id, f.sender, f.text.slice(0, 2000), f.reason, f.link, now, fu.i, fu.o, fu.t).run();
-          const body = `【${s.name}】${f.title}\n${f.sender ? f.sender + "：" : ""}${f.text.slice(0, 800)}\n理由：${f.reason}${f.link ? "\n" + f.link : ""}`;
-          try { await c.sendMessage(target.match(/^-?\d+$/) ? await c.getEntity(BigInt(target)) : target, { message: body, linkPreview: false }); } catch (e) { r.err = "推送失败 " + e.message; }
+          if (s.channels.length) {
+            const errs = await pushAll({
+              cfg, channels, ids: s.channels, c,
+              msg: { title: `【${s.name}】${f.title}`, text: `${f.sender ? f.sender + "：" : ""}${f.text.slice(0, 800)}\n理由：${f.reason}`, link: f.link, strategy: s.name, chat: f.title, reason: f.reason },
+            });
+            if (errs.length) r.err = "推送失败 " + errs.join("；");
+          }
         }
         r.hits = found.length;
         await db.prepare("UPDATE strategies SET cursors=?, last_run=? WHERE id=?").bind(JSON.stringify(cursors), now, s.id).run();
@@ -117,6 +123,8 @@ export async function runTask(env, id) {
   if (!s.chats.length) throw new Error("请先选择会话");
   const now = Math.floor(Date.now() / 1000);
   const results = [];
+  const pushErrs = [];
+  const channels = await listChannels(db);
   try {
   await withClient(cfg, async (c) => {
     const dialogs = await listDialogs(c);
@@ -133,9 +141,11 @@ export async function runTask(env, id) {
       results.push({ title, text: out, count: msgs.length, usage: { in: tk.i, out: tk.o, tot: tk.t } });
       await db.prepare("INSERT INTO hits(strategy_id,strategy_name,chat,msg_id,sender,text,reason,link,ts,tin,tout,ttot) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)")
         .bind(s.id, s.name, title, 0, "", out.slice(0, 20000), `任务结果 · ${msgs.length} 条`, "", now, tk.i, tk.o, tk.t).run();
-      if (s.push) {
-        const target = cfg.target_chat || "me";
-        try { await c.sendMessage(target.match(/^-?\d+$/) ? await c.getEntity(BigInt(target)) : target, { message: `【${s.name}】${title}\n${out.slice(0, 3500)}`, linkPreview: false }); } catch {}
+      if (s.channels.length) {
+        pushErrs.push(...await pushAll({
+          cfg, channels, ids: s.channels, c,
+          msg: { title: `【${s.name}】${title}`, text: out.slice(0, 3500), strategy: s.name, chat: title, reason: `任务结果 · ${msgs.length} 条` },
+        }));
       }
     }
   });
@@ -145,5 +155,5 @@ export async function runTask(env, id) {
   }
   await db.prepare("UPDATE strategies SET last_run=? WHERE id=?").bind(now, id).run();
   await setStat(db, id, null);
-  return { results };
+  return { results, pushErrs };
 }

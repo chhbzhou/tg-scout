@@ -15,11 +15,14 @@ export async function ensure(db) {
     db.prepare("CREATE INDEX IF NOT EXISTS hits_ts ON hits(ts DESC)"),
     db.prepare("CREATE TABLE IF NOT EXISTS sessions(h TEXT PRIMARY KEY, exp INTEGER NOT NULL)"),
     db.prepare("CREATE TABLE IF NOT EXISTS fails(ip TEXT PRIMARY KEY, n INTEGER NOT NULL, ts INTEGER NOT NULL, until INTEGER NOT NULL DEFAULT 0)"),
+    db.prepare("CREATE TABLE IF NOT EXISTS channels(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, type TEXT NOT NULL, config TEXT NOT NULL DEFAULT '{}', enabled INTEGER NOT NULL DEFAULT 1)"),
     db.prepare("CREATE TABLE IF NOT EXISTS usage(day TEXT PRIMARY KEY, inp INTEGER NOT NULL DEFAULT 0, outp INTEGER NOT NULL DEFAULT 0, tot INTEGER NOT NULL DEFAULT 0)"),
   ]);
-  for (const col of ["range_n INTEGER NOT NULL DEFAULT 50", "push INTEGER NOT NULL DEFAULT 0", "last_status TEXT NOT NULL DEFAULT ''", "last_err TEXT NOT NULL DEFAULT ''", "fail_n INTEGER NOT NULL DEFAULT 0", "@hits tin INTEGER NOT NULL DEFAULT 0", "@hits tout INTEGER NOT NULL DEFAULT 0", "@hits ttot INTEGER NOT NULL DEFAULT 0"]) {
+  for (const col of ["range_n INTEGER NOT NULL DEFAULT 50", "push INTEGER NOT NULL DEFAULT 0", "channels TEXT NOT NULL DEFAULT '[\"tg\"]'", "last_status TEXT NOT NULL DEFAULT ''", "last_err TEXT NOT NULL DEFAULT ''", "fail_n INTEGER NOT NULL DEFAULT 0", "@hits tin INTEGER NOT NULL DEFAULT 0", "@hits tout INTEGER NOT NULL DEFAULT 0", "@hits ttot INTEGER NOT NULL DEFAULT 0"]) {
     try { await db.prepare(col.startsWith("@hits ") ? "ALTER TABLE hits ADD COLUMN " + col.slice(6) : "ALTER TABLE strategies ADD COLUMN " + col).run(); } catch {}
   }
+  // 旧版手动策略没勾选推送的，迁移为不推送（之后 push 与渠道是否为空保持一致，不会反复生效）
+  try { await db.prepare("UPDATE strategies SET channels='[]' WHERE interval_min=0 AND push=0 AND channels='[\"tg\"]'").run(); } catch {}
   ready = true;
 }
 export async function getSettings(db) {
@@ -35,7 +38,7 @@ export async function delSetting(db, k) {
 }
 
 const J = (s, d) => { try { return JSON.parse(s); } catch { return d; } };
-export const rowToStrategy = (r) => ({ ...r, enabled: !!r.enabled, push: !!r.push, chats: J(r.chats, []), keywords: J(r.keywords, []), cursors: J(r.cursors, {}) });
+export const rowToStrategy = (r) => ({ ...r, enabled: !!r.enabled, push: !!r.push, channels: J(r.channels, []), chats: J(r.chats, []), keywords: J(r.keywords, []), cursors: J(r.cursors, {}) });
 
 export async function listStrategies(db) {
   const { results } = await db.prepare("SELECT * FROM strategies ORDER BY id").all();
@@ -56,20 +59,21 @@ function clean(b) {
     prompt: type === "ai" ? String(b.prompt || "") : "",
     interval_min: manual ? 0 : n,
     range_n: Math.max(1, Math.min(200, parseInt(b.range_n) || 50)),
-    push: b.push ? 1 : 0,
+    channels: JSON.stringify(Array.isArray(b.channels) ? [...new Set(b.channels.map(String))] : []),
+    push: Array.isArray(b.channels) && b.channels.length ? 1 : 0,
   };
 }
 export async function createStrategy(db, b) {
   const c = clean(b);
-  const r = await db.prepare("INSERT INTO strategies(name,type,enabled,chats,keywords,match_mode,prompt,interval_min,range_n,push) VALUES(?,?,?,?,?,?,?,?,?,?)")
-    .bind(c.name, c.type, c.enabled, c.chats, c.keywords, c.match_mode, c.prompt, c.interval_min, c.range_n, c.push).run();
+  const r = await db.prepare("INSERT INTO strategies(name,type,enabled,chats,keywords,match_mode,prompt,interval_min,range_n,push,channels) VALUES(?,?,?,?,?,?,?,?,?,?,?)")
+    .bind(c.name, c.type, c.enabled, c.chats, c.keywords, c.match_mode, c.prompt, c.interval_min, c.range_n, c.push, c.channels).run();
   return r.meta.last_row_id;
 }
 export async function updateStrategy(db, id, b) {
   const c = clean(b);
   // 改范围或类型时重置游标，避免回灌历史
-  await db.prepare("UPDATE strategies SET name=?,type=?,enabled=?,chats=?,keywords=?,match_mode=?,prompt=?,interval_min=?,range_n=?,push=?,cursors='{}' WHERE id=?")
-    .bind(c.name, c.type, c.enabled, c.chats, c.keywords, c.match_mode, c.prompt, c.interval_min, c.range_n, c.push, id).run();
+  await db.prepare("UPDATE strategies SET name=?,type=?,enabled=?,chats=?,keywords=?,match_mode=?,prompt=?,interval_min=?,range_n=?,push=?,channels=?,cursors='{}' WHERE id=?")
+    .bind(c.name, c.type, c.enabled, c.chats, c.keywords, c.match_mode, c.prompt, c.interval_min, c.range_n, c.push, c.channels, id).run();
 }
 export async function deleteStrategy(db, id) {
   await db.batch([
@@ -91,4 +95,25 @@ export async function getUsage(db) {
   const all = await db.prepare("SELECT COALESCE(SUM(inp),0) i, COALESCE(SUM(outp),0) o, COALESCE(SUM(tot),0) t FROM usage").first();
   const td = await db.prepare("SELECT inp i, outp o, tot t FROM usage WHERE day=?").bind(dayKey()).first();
   return { total: { in: all.i, out: all.o, tot: all.t }, today: { in: td?.i || 0, out: td?.o || 0, tot: td?.t || 0 } };
+}
+
+// ---------- 推送渠道 ----------
+export async function listChannels(db) {
+  const { results } = await db.prepare("SELECT * FROM channels ORDER BY id").all();
+  return results.map((r) => ({ ...r, enabled: !!r.enabled, config: J(r.config, {}) }));
+}
+export async function saveChannel(db, id, b) {
+  const name = String(b.name || "").trim().slice(0, 40) || "未命名";
+  const cfg = JSON.stringify(b.config && typeof b.config === "object" ? b.config : {});
+  if (id) { await db.prepare("UPDATE channels SET name=?,type=?,config=? WHERE id=?").bind(name, b.type, cfg, id).run(); return id; }
+  return (await db.prepare("INSERT INTO channels(name,type,config) VALUES(?,?,?)").bind(name, b.type, cfg).run()).meta.last_row_id;
+}
+export async function deleteChannel(db, id) {
+  await db.prepare("DELETE FROM channels WHERE id=?").bind(id).run();
+  // 把策略里引用该渠道的去掉
+  const { results } = await db.prepare("SELECT id,channels FROM strategies").all();
+  for (const r of results) {
+    const ids = J(r.channels, []);
+    if (ids.includes(String(id))) await db.prepare("UPDATE strategies SET channels=? WHERE id=?").bind(JSON.stringify(ids.filter((x) => x !== String(id))), r.id).run();
+  }
 }

@@ -83,7 +83,7 @@ a{color:var(--ac);text-decoration:none}
 <div class="mask" id="mask" onclick="closeD()"></div><aside class="drawer" id="dw"></aside><div id="toast"></div>
 <script>
 const $=(s,r=document)=>r.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let tab='s',dialogs=null,S=[],ST=null,editing=null,HS=[],SS=null,US=null,ver=0,dirty=false;
+let tab='s',dialogs=null,S=[],ST=null,editing=null,HS=[],SS=null,US=null,CH=null,ver=0,dirty=false;
 const tok=()=>{try{return localStorage.getItem('tgs_tok')||''}catch{return''}};
 function toast(t,sticky){const m=$('#toast');m.textContent=t;m.classList.add('on');clearTimeout(toast.t);if(!sticky)toast.t=setTimeout(()=>m.classList.remove('on'),2800)}
 async function api(m,p,b,t=tok()){const r=await fetch('/api/'+p,{method:m,headers:{authorization:'Bearer '+t,'content-type':'application/json'},body:b?JSON.stringify(b):undefined});
@@ -111,13 +111,14 @@ const load={
  st:()=>api('GET','settings').then(x=>ST=x),
  ss:()=>api('GET','strategies').then(x=>S=x),
  hs:()=>api('GET','hits').then(x=>HS=x),
- us:()=>api('GET','usage').then(x=>US=x)};
+ us:()=>api('GET','usage').then(x=>US=x),
+ ch:()=>api('GET','channels').then(x=>CH=x)};
 function paint(){if(!ST)return;paintAcc();({s:viewS,h:viewH,c:viewC})[tab]();if(tab==='c'){initT();bindDirty()}}
 // 先用缓存立刻画出来，再后台刷新对应数据
 const render=G(async(fresh=true)=>{const my=++ver;paint();if(!fresh)return;
- const need={s:['ss','st'],h:['hs','ss','st'],c:['st','us']}[tab];
+ const need={s:['ss','st'],h:['hs','ss','st'],c:['st','us','ch']}[tab];
  await Promise.all(need.map(k=>load[k]()));if(my===ver&&!(tab==='c'&&dirty))paint()});
-const prefetch=()=>Promise.all([load.ss(),load.hs()]).then(()=>paint()).catch(e=>{if(e.auth)showAuth()});
+const prefetch=()=>Promise.all([load.ss(),load.hs(),load.ch()]).then(()=>paint()).catch(e=>{if(e.auth)showAuth()});
 $('#runall').onclick=G(async()=>{const b=$('#runall');b.disabled=true;toast('运行中，请稍候…',true);try{const r=await api('POST','run');toast(r.skipped||('已运行 '+(r.ran||0)+' 个策略'))}finally{b.disabled=false}render()});
 
 function viewS(){
@@ -125,18 +126,18 @@ function viewS(){
  (S.map(s=>{const sc=s.chats.length?s.chats.length+' 个会话':'全部会话';
   return '<div class="card"><div class="srow">'+(s.interval_min===0?'':'<label class="sw"><input type="checkbox" '+(s.enabled?'checked':'')+' onchange="toggle('+s.id+',this.checked)"><i></i></label>')+
   '<div class="main"><div class="title t">'+esc(s.name)+'</div><div class="sub t">'+esc(s.type==='keyword'?s.keywords.join('  ·  '):s.prompt)+'</div>'+
-  '<div class="meta"><span class="chip '+(s.type==='ai'?'ai':'kw')+'">'+(s.type==='ai'?'AI 分析':'关键字')+'</span>'+(s.interval_min===0?'<span class="chip">手动 · 最近 '+s.range_n+' 条</span>':'<span class="chip">每 '+s.interval_min+' 分钟</span>')+'<span class="chip">'+sc+'</span><span class="chip"><i class="dot '+(s.last_status==='ok'?'on':s.last_status==='err'?'bad':'')+'"></i>上次 '+ago(s.last_run)+'</span></div>'+(s.last_status==='err'?'<div class="sub t" style="color:var(--bad)" title="'+esc(s.last_err)+'">失败：'+esc(s.last_err)+(s.fail_n>1?'（连续 '+s.fail_n+' 次）':'')+'</div>':'')+'</div>'+
+  '<div class="meta"><span class="chip '+(s.type==='ai'?'ai':'kw')+'">'+(s.type==='ai'?'AI 分析':'关键字')+'</span>'+(s.interval_min===0?'<span class="chip">手动 · 最近 '+s.range_n+' 条</span>':'<span class="chip">每 '+s.interval_min+' 分钟</span>')+'<span class="chip">'+sc+'</span><span class="chip">'+(s.channels.length?'推送 '+s.channels.length+' 个渠道':'不推送')+'</span><span class="chip"><i class="dot '+(s.last_status==='ok'?'on':s.last_status==='err'?'bad':'')+'"></i>上次 '+ago(s.last_run)+'</span></div>'+(s.last_status==='err'?'<div class="sub t" style="color:var(--bad)" title="'+esc(s.last_err)+'">失败：'+esc(s.last_err)+(s.fail_n>1?'（连续 '+s.fail_n+' 次）':'')+'</div>':'')+'</div>'+
   '<div style="display:grid;gap:6px"><button class="btn sm" onclick="runOne('+s.id+',this)">运行</button><button class="btn sm" onclick="edit('+s.id+')">编辑</button></div></div></div>'}).join('')||'<div class="empty">暂无策略</div>')+'</div>';
 }
 const toggle=G(async(id,on)=>{const s=S.find(x=>x.id===id);await api('PUT','strategies/'+id,{...s,enabled:on});s.enabled=on;toast(on?'已启用':'已停用')});
 const runOne=G(async(id,btn)=>{if(btn){btn.disabled=true;btn.textContent='运行中'}toast('运行中，请稍候…',true);let r;try{r=await api('POST','strategies/'+id+'/run')}finally{if(btn){btn.disabled=false;btn.textContent='运行'}}
- if(r.results){openD('<div class="dh"><b>任务结果</b><button class="btn sm" onclick="closeD()">关闭</button></div><div class="db">'+r.results.map(x=>'<div class="fld"><label>'+esc(x.title)+(x.count?' · '+x.count+' 条':'')+'</label><div class="hit"><div class="tx" style="white-space:pre-wrap;word-break:break-word">'+esc(x.text)+'</div></div>'+(x.usage?'<div class="sub" style="margin-top:6px">输入 '+nf(x.usage.in)+' · 输出 '+nf(x.usage.out)+' · 消耗 '+nf(x.usage.tot)+' tokens</div>':'')+'</div>').join('')+'</div><div class="df"><button class="btn" onclick="copyHit()">复制</button></div>');window._hitText=r.results.map(x=>(r.results.length>1?'【'+x.title+'】\n':'')+x.text).join('\n\n');toast('完成');render(false);return}const x=r.report?.[0];toast(x?(x.err?x.err:'新消息 '+x.new+' 条，命中 '+x.hits+' 条'):(r.error||r.skipped||'无变化'));render()});
+ if(r.results){openD('<div class="dh"><b>任务结果</b><button class="btn sm" onclick="closeD()">关闭</button></div><div class="db">'+r.results.map(x=>'<div class="fld"><label>'+esc(x.title)+(x.count?' · '+x.count+' 条':'')+'</label><div class="hit"><div class="tx" style="white-space:pre-wrap;word-break:break-word">'+esc(x.text)+'</div></div>'+(x.usage?'<div class="sub" style="margin-top:6px">输入 '+nf(x.usage.in)+' · 输出 '+nf(x.usage.out)+' · 消耗 '+nf(x.usage.tot)+' tokens</div>':'')+'</div>').join('')+'</div><div class="df"><button class="btn" onclick="copyHit()">复制</button></div>');window._hitText=r.results.map(x=>(r.results.length>1?'【'+x.title+'】\n':'')+x.text).join('\n\n');if(r.pushErrs?.length)toast('推送失败：'+r.pushErrs.join('；'));else toast('完成');render(false);return}const x=r.report?.[0];toast(x?(x.err?x.err:'新消息 '+x.new+' 条，命中 '+x.hits+' 条'):(r.error||r.skipped||'无变化'));render()});
 
 function openD(html){$('#dw').innerHTML=html;$('#mask').classList.add('on');$('#dw').classList.add('on')}
 function closeD(){$('#mask').classList.remove('on');$('#dw').classList.remove('on')}
 const edit=G(async id=>{
  const s=id?S.find(x=>x.id===id):{name:'',type:'keyword',enabled:true,chats:[],keywords:[],match_mode:'any',prompt:'',interval_min:5};
- editing={id:id||0,type:s.type,manual:s.type==='ai'&&s.interval_min===0,kws:[...s.keywords],sel:new Set(s.chats)};
+ if(!CH)await load.ch();editing={id:id||0,ch:new Set(id?s.channels:(CH.builtin[0].ready?['tg']:[])),type:s.type,manual:s.type==='ai'&&s.interval_min===0,kws:[...s.keywords],sel:new Set(s.chats)};
  openD('<div class="dh"><b>'+(id?'编辑策略':'新增策略')+'</b><button class="btn sm" onclick="closeD()">关闭</button></div><div class="db">'+
  '<div class="fld"><label>名称</label><input id="f_name" value="'+esc(s.name)+'"></div>'+
  '<div class="fld"><label>类型</label><div class="seg" id="seg"><button data-v="keyword">关键字匹配</button><button data-v="ai">AI 分析匹配</button></div></div>'+
@@ -145,15 +146,15 @@ const edit=G(async id=>{
  '<div class="fld kw"><label>关键字</label><div class="tags" id="tags"></div></div>'+
  '<div class="fld kw"><label>匹配方式</label><select id="f_mode"><option value="any">任一命中</option><option value="all">全部命中</option><option value="regex">正则</option></select></div>'+
  '<div class="fld mn"><label>读取最近消息条数</label><input id="f_rn" type="number" min="1" max="200" value="'+(s.range_n||50)+'"></div>'+
- '<div class="fld mn"><label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input id="f_push" type="checkbox" style="width:auto"'+(s.push?' checked':'')+'>结果推送到目标会话</label></div>'+
  '<div class="fld ai"><label>提示词</label><textarea id="f_pr">'+esc(s.prompt)+'</textarea></div>'+
+ '<div class="fld"><label>推送到</label><div class="pick"><div class="ls" id="f_ch"></div></div></div>'+
  '<div class="fld"><label>会话 <span id="cn"></span></label><div class="pick"><input id="q" placeholder="搜索会话"><div class="ls" id="ls"><div class="empty" style="padding:16px">加载中…</div></div></div></div>'+
  '</div><div class="df">'+(id?'<button class="btn bad" style="margin-right:auto" onclick="del('+id+')">删除</button>':'')+'<button class="btn" onclick="closeD()">取消</button><button class="btn pri" onclick="save()">保存</button></div>');
  $('#f_mode').value=s.match_mode;
  $('#seg').onclick=e=>{if(e.target.dataset.v){editing.type=e.target.dataset.v;typeUI()}};
  $('#seg2').onclick=e=>{if(e.target.dataset.m!=null){editing.manual=e.target.dataset.m==='1';typeUI()}};typeUI();tagsUI();
  const t=$('#tags');t.onclick=e=>{if(e.target.dataset.x!=null){editing.kws.splice(+e.target.dataset.x,1);tagsUI()}else $('#ti')?.focus()};
- loadList();
+ chList();loadList();
 });
 function typeUI(){const t=editing.type,ai=t==='ai',m=ai&&editing.manual;[...$('#seg').children].forEach(b=>b.classList.toggle('on',b.dataset.v===t));
  [...$('#seg2').children].forEach(b=>b.classList.toggle('on',(b.dataset.m==='1')===!!editing.manual));
@@ -162,12 +163,15 @@ function typeUI(){const t=editing.type,ai=t==='ai',m=ai&&editing.manual;[...$('#
 function tagsUI(){$('#tags').innerHTML=editing.kws.map((k,i)=>'<span class="tg">'+esc(k)+'<b data-x="'+i+'">×</b></span>').join('')+'<input id="ti" placeholder="'+(editing.kws.length?'':'输入后回车')+'">';
  const ti=$('#ti');ti.onkeydown=e=>{if((e.key==='Enter'||e.key===',')&&ti.value.trim()){e.preventDefault();editing.kws.push(ti.value.trim().replace(/,$/,''));tagsUI();$('#ti').focus()}else if(e.key==='Backspace'&&!ti.value&&editing.kws.length){editing.kws.pop();tagsUI();$('#ti').focus()}};
  ti.onblur=()=>{if(ti.value.trim()){editing.kws.push(ti.value.trim());tagsUI()}}}
+function chList(){const all=[...CH.builtin.map(b=>({id:b.id,name:b.name,tag:'内置',ready:b.ready})),...CH.custom.map(c=>({id:String(c.id),name:c.name,tag:CHN[c.type]||c.type,ready:true}))];
+ $('#f_ch').innerHTML=all.map(c=>'<label><input type="checkbox" value="'+c.id+'"'+(editing.ch.has(c.id)?' checked':'')+(c.ready?'':' disabled')+'><span class="t" style="flex:1">'+esc(c.name)+'</span><span class="chip">'+(c.ready?esc(c.tag):'未配置')+'</span></label>').join('')||'<div class="empty" style="padding:16px">暂无渠道</div>';
+ $('#f_ch').onchange=e=>{e.target.checked?editing.ch.add(e.target.value):editing.ch.delete(e.target.value)}}
 function cn(){$('#cn').textContent=editing.sel.size?'· 已选 '+editing.sel.size:'· 全部'}
 const loadList=G(async()=>{cn();if(!ST.logged_in){$('#ls').innerHTML='<div class="empty" style="padding:16px">未登录</div>';return}
  dialogs=dialogs||await api('GET','tg/dialogs');const draw=()=>{const q=$('#q').value.toLowerCase();
   $('#ls').innerHTML=dialogs.filter(d=>!q||d.title.toLowerCase().includes(q)).map(d=>'<label><input type="checkbox" value="'+d.id+'"'+(editing.sel.has(d.id)?' checked':'')+'><span class="t" style="flex:1">'+esc(d.title||d.id)+'</span><span class="chip">'+({user:'私聊',group:'群组',channel:'频道'}[d.kind]||'其他')+'</span></label>').join('')||'<div class="empty" style="padding:16px">无结果</div>'};
  draw();$('#q').oninput=draw;$('#ls').onchange=e=>{e.target.checked?editing.sel.add(e.target.value):editing.sel.delete(e.target.value);cn()}});
-const save=G(async()=>{const b={name:$('#f_name').value.trim(),type:editing.type,interval_min:(editing.type==='ai'&&editing.manual)?0:+$('#f_int').value,chats:[...editing.sel],keywords:editing.kws,match_mode:$('#f_mode').value,prompt:$('#f_pr').value,range_n:+$('#f_rn').value,push:$('#f_push').checked,enabled:true};
+const save=G(async()=>{const b={name:$('#f_name').value.trim(),type:editing.type,interval_min:(editing.type==='ai'&&editing.manual)?0:+$('#f_int').value,chats:[...editing.sel],keywords:editing.kws,match_mode:$('#f_mode').value,prompt:$('#f_pr').value,range_n:+$('#f_rn').value,channels:[...editing.ch],enabled:true};
  if(editing.id)b.enabled=S.find(x=>x.id===editing.id).enabled;
  if(!b.name)throw new Error('请填名称');if(b.type==='keyword'&&!b.keywords.length)throw new Error('请添加关键字');if(b.type==='ai'&&!b.prompt.trim())throw new Error('请填提示词');
  if(b.interval_min===0&&!b.chats.length)throw new Error('手动运行需要选择会话');
@@ -177,8 +181,11 @@ const del=G(async id=>{if(!confirm('删除该策略及其命中记录？'))retur
 
 function viewH(){
  const ss=S;window._hits=HS;
- $('#v').innerHTML='<div class="head"><h2>命中</h2><select id="hf" style="width:auto;max-width:50%" onchange="hdraw()"><option value="">全部策略</option>'+ss.map(s=>'<option value="'+s.id+'">'+esc(s.name)+'</option>').join('')+'</select><button class="btn bad" onclick="clr()">清空</button></div><div class="list" id="hl"></div>';hdraw()}
-function hdraw(){const f=$('#hf').value;$('#hl').innerHTML=_hits.filter(h=>!f||String(h.strategy_id)===f).map(h=>'<div class="card" style="cursor:pointer" onclick="showHit('+h.id+')"><div class="srow"><b class="t main">'+esc(h.strategy_name)+' <span class="mut" style="font-weight:400">· '+esc(h.chat)+'</span></b><span class="mut">'+ago(h.ts)+'</span></div><div class="sub t">'+esc(h.preview.replace(/\s+/g,' '))+'</div><div class="meta"><span class="chip">'+esc(h.reason)+'</span>'+(h.len>100?'<span class="chip">'+h.len+' 字</span>':'')+(h.ttot?'<span class="chip">输入 '+nf(h.tin)+' · 输出 '+nf(h.tout)+' · 消耗 '+nf(h.ttot)+'</span>':'')+'</div></div>').join('')||'<div class="empty">暂无记录</div>'}
+ $('#v').innerHTML='<div class="head"><h2>命中</h2><input id="hq" type="search" placeholder="搜索" style="flex:1;min-width:110px;max-width:260px" oninput="hsearch()"><select id="hf" style="width:auto;max-width:40%" onchange="hload()"><option value="">全部策略</option>'+ss.map(s=>'<option value="'+s.id+'">'+esc(s.name)+'</option>').join('')+'</select><button class="btn bad" onclick="clr()">清空</button></div><div class="list" id="hl"></div>';hdraw()}
+let hT=0;function hsearch(){clearTimeout(hT);hT=setTimeout(hload,300)}
+const hload=G(async()=>{const f=$('#hf').value,q=$('#hq').value.trim(),p=new URLSearchParams();if(f)p.set('strategy',f);if(q)p.set('q',q);
+ const r=await api('GET','hits'+(p.toString()?'?'+p:''));if(($('#hf')?.value||'')!==f||($('#hq')?.value.trim()||'')!==q)return;_hits=r;if(!f&&!q)HS=r;hdraw()});
+function hdraw(){$('#hl').innerHTML=_hits.map(h=>'<div class="card" style="cursor:pointer" onclick="showHit('+h.id+')"><div class="srow"><b class="t main">'+esc(h.strategy_name)+' <span class="mut" style="font-weight:400">· '+esc(h.chat)+'</span></b><span class="mut">'+ago(h.ts)+'</span></div><div class="sub t">'+esc(h.preview.replace(/\s+/g,' '))+'</div><div class="meta"><span class="chip">'+esc(h.reason)+'</span>'+(h.len>100?'<span class="chip">'+h.len+' 字</span>':'')+(h.ttot?'<span class="chip">输入 '+nf(h.tin)+' · 输出 '+nf(h.tout)+' · 消耗 '+nf(h.ttot)+'</span>':'')+'</div></div>').join('')||'<div class="empty">'+($('#hq').value.trim()?'无结果':'暂无记录')+'</div>'}
 const showHit=G(async id=>{const h=await api('GET','hits/'+id);openD('<div class="dh"><b class="t">'+esc(h.strategy_name)+'</b><button class="btn sm" onclick="closeD()">关闭</button></div><div class="db"><div class="meta" style="margin:0"><span class="chip">'+esc(h.chat)+'</span><span class="chip">'+new Date(h.ts*1000).toLocaleString()+'</span><span class="chip">'+esc(h.reason)+'</span>'+(h.link?'<a href="'+esc(h.link)+'" target="_blank" rel="noreferrer">原文 ↗</a>':'')+'</div><div class="tx" style="white-space:pre-wrap;word-break:break-word;background:var(--panel2);border-radius:8px;padding:12px">'+esc(h.text)+'</div>'+(h.ttot?'<div class="sub">输入 '+nf(h.tin)+' · 输出 '+nf(h.tout)+' · 消耗 '+nf(h.ttot)+' tokens</div>':'')+'</div><div class="df"><button class="btn bad" style="margin-right:auto" onclick="delHit('+h.id+')">删除</button><button class="btn" onclick="copyHit()">复制</button></div>');window._hitText=h.text});
 const copyHit=()=>navigator.clipboard?.writeText(window._hitText||'').then(()=>toast('已复制'),()=>toast('复制失败'));
 const delHit=G(async id=>{await api('DELETE','hits/'+id);closeD();HS=HS.filter(x=>x.id!==id);_hits=HS;hdraw();toast('已删除')});
@@ -189,6 +196,7 @@ function viewC(){
  $('#v').innerHTML='<div class="head"><h2>设置</h2><button class="btn" id="savebtn" onclick="saveC()" disabled>保存</button></div>'+
  '<div class="card sec"><div class="srow" style="margin-bottom:12px"><h3 class="main" style="margin:0">AI</h3><button class="btn sm" id="atest" onclick="testAI()">测试</button></div><div class="g">'+f('ai_base','接口地址','text','https://api.openai.com/v1')+'<div class="two">'+f('ai_model','模型')+f('ai_key','密钥','password')+'</div><div id="usage">'+usageHtml()+'</div></div></div>'+
  '<div class="card sec"><div class="srow" style="margin-bottom:12px"><h3 class="main" style="margin:0">Telegram</h3><a href="https://my.telegram.org/apps" target="_blank" rel="noopener noreferrer">创建 api_id ↗</a></div><div class="g"><div class="two">'+f('tg_api_id','api_id')+f('tg_api_hash','api_hash','password')+'</div>'+'<div class="fld"><label>出口代理</label><div style="display:flex;gap:8px"><input id="c_proxy" placeholder="socks5://用户:密码@主机:端口" value="'+esc(s.proxy)+'" autocomplete="off"><button class="btn" id="ptest" onclick="testProxy()">测试</button></div></div>'+'<div class="fld"><label>推送到</label><div style="display:grid;gap:8px"><select id="c_tmode" onchange="tmode()"><option value="me">已保存消息</option><option value="custom">自定义</option></select><input id="c_target_chat" placeholder="@频道名 / 会话 id" autocomplete="off" hidden></div></div></div></div>'+
+ '<div class="card sec"><div class="srow" style="margin-bottom:6px"><h3 class="main" style="margin:0">推送渠道</h3><button class="btn sm" onclick="chEdit()">添加渠道</button></div><div id="chlist">'+chHtml()+'</div></div>'+
  '<div class="card sec"><h3>记录</h3><div class="g"><div class="fld"><label>保留天数（0 为不清理）</label><input id="c_hits_days" type="number" min="0" max="3650" value="'+esc(s.hits_days||'30')+'"></div></div></div>'+
  '<div class="card sec"><h3>访问密码</h3><div class="g"><div class="two"><div class="fld"><label>新密码</label><input id="p1" type="password" autocomplete="new-password" placeholder="至少 8 位"></div><div class="fld"><label>确认密码</label><input id="p2" type="password" autocomplete="new-password"></div></div><div><button class="btn pri" onclick="setPw()">修改密码</button></div></div></div>'+
  '<div class="card sec"><h3>两步验证</h3><div id="totpbox">'+totpHtml()+'</div></div>'+
@@ -209,6 +217,36 @@ const totpSetup=G(async()=>{const r=await api('POST','totp/setup',{});$('#totpbo
 const totpOn=G(async()=>{await api('POST','totp/enable',{code:$('#t_code').value.trim()});toast('两步验证已开启');render()});
 const totpOff=G(async()=>{await api('POST','totp/disable',{code:$('#t_code').value.trim()});toast('两步验证已关闭');render()});
 const testMail=G(async()=>{const b=$('#mtest');b.disabled=true;b.textContent='发送中';try{await saveC(true);await api('POST','mail/test',{});toast('测试邮件已发送')}finally{b.disabled=false;b.textContent='发送测试邮件'}});
+const CHN={tg_bot:'Telegram 机器人',webhook:'Webhook / 机器人',bark:'Bark',serverchan:'Server酱',ntfy:'ntfy'};
+const WHF={json:'通用 JSON',feishu:'飞书',dingtalk:'钉钉',wecom:'企业微信',discord:'Discord',slack:'Slack'};
+function chHtml(){if(!CH)return '<div class="mut" style="padding:8px 0">加载中…</div>';
+ const row=(name,sub,tag,extra)=>'<div class="srow" style="padding:9px 0;border-top:1px solid var(--bd)"><div class="main"><div class="title t">'+esc(name)+'</div><div class="sub t">'+esc(sub||'')+'</div></div>'+tag+extra+'</div>';
+ return CH.builtin.map(b=>row(b.name,b.detail,'<span class="chip"><i class="dot '+(b.ready?'on':'bad')+'"></i>'+(b.ready?'内置':'未配置')+'</span>','<button class="btn sm" '+(b.ready?'':'disabled')+' onclick="chTest(\''+b.id+'\',this)">测试</button>')).join('')+
+ CH.custom.map(c=>row(c.name,CHN[c.type]||c.type,'','<button class="btn sm" onclick="chTest('+c.id+',this)">测试</button><button class="btn sm" onclick="chEdit('+c.id+')">编辑</button>')).join('')}
+const chTest=G(async(id,btn)=>{btn.disabled=true;const t=btn.textContent;btn.textContent='测试中';try{
+ const c=typeof id==='number'?CH.custom.find(x=>x.id===id):null;
+ await api('POST','channels/test',c?{id:c.id,type:c.type,config:c.config}:{id});toast('测试消息已发送')}finally{btn.disabled=false;btn.textContent=t}});
+let ED=null;
+function chFields(){const t=ED.type,c=ED.config,v=k=>esc(c[k]||''),
+ inp=(k,l,ph,ty)=>'<div class="fld"><label>'+l+'</label><input id="cf_'+k+'" type="'+(ty||'text')+'" placeholder="'+(ph||'')+'" value="'+v(k)+'" autocomplete="off"></div>';
+ let h='';
+ if(t==='tg_bot')h=inp('token','Bot Token','','password')+inp('chat_id','Chat ID','数字 ID 或 @频道名');
+ else if(t==='webhook')h='<div class="fld"><label>格式</label><select id="cf_format">'+Object.entries(WHF).map(([k,n])=>'<option value="'+k+'"'+((c.format||'json')===k?' selected':'')+'>'+n+'</option>').join('')+'</select></div>'+inp('url','Webhook 地址','','password')+((c.format==='feishu'||c.format==='dingtalk')?inp('secret','签名密钥（可选）','','password'):'');
+ else if(t==='bark')h=inp('server','服务地址（可选）','https://api.day.app')+inp('key','Key','','password');
+ else if(t==='serverchan')h=inp('key','SendKey','','password');
+ else if(t==='ntfy')h=inp('server','服务地址（可选）','https://ntfy.sh')+inp('topic','主题')+inp('token','Token（可选）','','password');
+ $('#cf_fields').innerHTML=h;const f=$('#cf_format');if(f)f.onchange=()=>{chRead();chFields()}}
+function chRead(){const o={};document.querySelectorAll('#cf_fields [id^=cf_]').forEach(e=>{o[e.id.slice(3)]=e.value.trim()});ED.config=o;ED.name=$('#cf_name').value}
+const chEdit=G(async id=>{if(!CH)await load.ch();const c=id?CH.custom.find(x=>x.id===id):null;ED={id:id||0,type:c?.type||'tg_bot',name:c?.name||'',config:{...(c?.config||{})}};
+ openD('<div class="dh"><b>'+(id?'编辑渠道':'添加渠道')+'</b><button class="btn sm" onclick="closeD()">关闭</button></div><div class="db">'+
+ '<div class="fld"><label>类型</label><select id="cf_type"'+(id?' disabled':'')+'>'+Object.entries(CHN).map(([k,n])=>'<option value="'+k+'">'+n+'</option>').join('')+'</select></div>'+
+ '<div class="fld"><label>名称</label><input id="cf_name" value="'+esc(ED.name)+'" placeholder="例如：我的飞书群"></div><div id="cf_fields" style="display:grid;gap:14px"></div>'+
+ '</div><div class="df">'+(id?'<button class="btn bad" style="margin-right:auto" onclick="chDel('+id+')">删除</button>':'')+'<button class="btn" id="cf_test" onclick="chTestForm()">测试</button><button class="btn pri" onclick="chSave()">保存</button></div>');
+ $('#cf_type').value=ED.type;$('#cf_type').onchange=e=>{chRead();ED.type=e.target.value;ED.config={};chFields()};chFields()});
+const chSave=G(async()=>{chRead();if(!ED.name.trim())throw new Error('请填名称');const b={name:ED.name,type:ED.type,config:ED.config};
+ ED.id?await api('PUT','channels/'+ED.id,b):await api('POST','channels',b);closeD();await load.ch();toast('已保存');if(tab==='c'){const e=$('#chlist');if(e)e.innerHTML=chHtml()}});
+const chTestForm=G(async()=>{chRead();const b=$('#cf_test');b.disabled=true;b.textContent='测试中';try{await api('POST','channels/test',{id:ED.id||undefined,type:ED.type,config:ED.config});toast('测试消息已发送')}finally{b.disabled=false;b.textContent='测试'}});
+const chDel=G(async id=>{if(!confirm('删除该渠道？已选用它的策略会自动取消勾选'))return;await api('DELETE','channels/'+id);closeD();await load.ch();toast('已删除');if(tab==='c'){const e=$('#chlist');if(e)e.innerHTML=chHtml()}});
 function tmode(){const c=$('#c_tmode').value==='custom';$('#c_target_chat').hidden=!c;if(c)$('#c_target_chat').focus()}
 const saveC=G(async(quiet)=>{const b={};['ai_base','ai_key','ai_model','tg_api_id','tg_api_hash','proxy','hits_days','resend_key','notify_email','mail_from'].forEach(k=>b[k]=$('#c_'+k).value.trim());
  if($('#c_tmode').value==='custom'){b.target_chat=$('#c_target_chat').value.trim();if(!b.target_chat)throw new Error('请填推送目标')}else b.target_chat='me';await api('PUT','settings',b);

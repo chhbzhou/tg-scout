@@ -4,6 +4,7 @@ import { runDue, runTask } from "./run.js";
 import { PAGE } from "./ui.js";
 import { probeProxy } from "./sockets.js";
 import * as A from "./auth.js";
+import { SECRET_FIELDS, TYPES, sendChannel, tgSelf } from "./notify.js";
 
 const SECRET_KEYS = ["ai_key", "tg_api_hash", "session", "temp_session", "resend_key"];
 const SETTING_KEYS = ["resend_key", "notify_email", "mail_from", "hits_days", "ai_base", "ai_key", "ai_model", "proxy", "tg_api_id", "tg_api_hash", "target_chat"];
@@ -141,6 +142,38 @@ export default {
         if (!px) return json({ error: "未填写代理" }, 400);
         return json(await probeProxy(px));
       }
+      if (p === "channels" && req.method === "GET") {
+        const cfg = await db.getSettings(env.DB);
+        const custom = (await db.listChannels(env.DB)).map((c) => ({ ...c, config: Object.fromEntries(Object.entries(c.config).map(([k, v]) => [k, (SECRET_FIELDS[c.type] || []).includes(k) ? mask(String(v)) : v])) }));
+        return json({ builtin: [{ id: "tg", name: "Telegram 会话", ready: !!cfg.session, detail: cfg.target_chat && cfg.target_chat !== "me" ? cfg.target_chat : "已保存消息" }, { id: "email", name: "邮件", ready: A.mailOn(cfg), detail: cfg.notify_email || "" }], custom });
+      }
+      if (p === "channels" && req.method === "POST") {
+        if (!TYPES.includes(body.type)) return json({ error: "不支持的渠道类型" }, 400);
+        return json({ id: await db.saveChannel(env.DB, 0, body) });
+      }
+      if (p === "channels/test" && req.method === "POST") {
+        const cfg = await db.getSettings(env.DB);
+        const text = "这是一条来自 TG Scout 的测试消息";
+        if (body.id === "tg") { await tg.withClient(cfg, (c) => tgSelf(c, cfg, `【TG Scout】${text}`)); return json({ ok: true }); }
+        if (body.id === "email") { if (!A.mailOn(cfg)) return json({ error: "邮件未启用" }, 400); await A.sendMail(cfg, "TG Scout 测试", text); return json({ ok: true }); }
+        if (!TYPES.includes(body.type)) return json({ error: "不支持的渠道类型" }, 400);
+        const saved = body.id ? (await db.listChannels(env.DB)).find((x) => String(x.id) === String(body.id)) : null;
+        const config = { ...(body.config || {}) };
+        for (const k of SECRET_FIELDS[body.type]) if (String(config[k] || "").startsWith("••••") && saved) config[k] = saved.config[k];
+        await sendChannel({ type: body.type, config }, { title: "【TG Scout】测试", text, strategy: "test", chat: "", reason: "" });
+        return json({ ok: true });
+      }
+      const cm = p.match(/^channels\/(\d+)$/);
+      if (cm && req.method === "PUT") {
+        if (!TYPES.includes(body.type)) return json({ error: "不支持的渠道类型" }, 400);
+        const old = (await db.listChannels(env.DB)).find((x) => x.id === +cm[1]);
+        if (!old) return json({ error: "渠道不存在" }, 404);
+        const config = { ...(body.config || {}) };
+        for (const k of SECRET_FIELDS[body.type]) if (String(config[k] || "").startsWith("••••") && old.type === body.type) config[k] = old.config[k];
+        await db.saveChannel(env.DB, +cm[1], { ...body, config });
+        return json({ ok: true });
+      }
+      if (cm && req.method === "DELETE") { await db.deleteChannel(env.DB, +cm[1]); return json({ ok: true }); }
       if (p === "strategies" && req.method === "GET") return json(await db.listStrategies(env.DB));
       if (p === "strategies" && req.method === "POST") return json({ id: await db.createStrategy(env.DB, body) });
       const sm = p.match(/^strategies\/(\d+)(\/run)?$/);
@@ -155,9 +188,17 @@ export default {
       }
       if (p === "hits") {
         const sid = url.searchParams.get("strategy");
+        const q = (url.searchParams.get("q") || "").trim().slice(0, 100);
         const cols = "id,strategy_id,strategy_name,chat,reason,link,ts,tin,tout,ttot,substr(text,1,100) AS preview,length(text) AS len";
-        const q = sid ? env.DB.prepare(`SELECT ${cols} FROM hits WHERE strategy_id=? ORDER BY id DESC LIMIT 200`).bind(+sid) : env.DB.prepare(`SELECT ${cols} FROM hits ORDER BY id DESC LIMIT 200`);
-        return json((await q.all()).results);
+        const where = [], args = [];
+        if (sid) { where.push("strategy_id=?"); args.push(+sid); }
+        if (q) {
+          const like = "%" + q.replace(/[\\%_]/g, "\\$&") + "%";
+          where.push("(text LIKE ? ESCAPE '\\' OR chat LIKE ? ESCAPE '\\' OR reason LIKE ? ESCAPE '\\' OR strategy_name LIKE ? ESCAPE '\\' OR sender LIKE ? ESCAPE '\\')");
+          args.push(like, like, like, like, like);
+        }
+        const sql = `SELECT ${cols} FROM hits${where.length ? " WHERE " + where.join(" AND ") : ""} ORDER BY id DESC LIMIT 200`;
+        return json((await env.DB.prepare(sql).bind(...args).all()).results);
       }
       const hm = p.match(/^hits\/(\d+)$/);
       if (hm && req.method === "GET") {

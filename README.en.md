@@ -12,8 +12,9 @@ It signs in to your own account, read-only, watches the chats you choose, and pi
 - **Two kinds of strategies**
   - **Keyword**: any / all / regex, with a configurable interval.
   - **AI**: write a prompt and the AI decides which new messages match. Run it on a schedule, or set it to **manual** to analyze the latest N messages of selected chats once (e.g. "translate to English", "summarize").
-- **Read-only**: never posts or replies; it only pushes results to the chat you choose.
-- **Records**: matches and task results are stored as a list; open one to read it in full, copy or delete it; old records are purged automatically.
+- **Read-only**: never posts or replies; it only pushes results out.
+- **Many push channels**: Telegram chat, Telegram bot, email, Webhook (Feishu / DingTalk / WeCom / Discord / Slack / generic JSON), Bark, ServerChan, ntfy; each strategy picks its own channels.
+- **Records**: matches and task results are stored as a searchable list; open one to read it in full, copy or delete it; old records are purged automatically.
 - **AI usage**: today / total input, output and total tokens, plus per-result consumption.
 - **Egress proxy**: SOCKS5 with a one-click test (exit IP, region, latency to Telegram).
 - **Login protection**: failed-attempt lockout, optional TOTP two-step verification, optional password recovery by email.
@@ -136,10 +137,28 @@ Format: `socks5://user:pass@host:port`, or `socks5://host:port` without auth. UR
 
 **Test** connects through the proxy to ip-api.com to show the exit IP and region, then to a Telegram server and shows the latency.
 
-### Push target
+### Push channels
 
-- **Saved Messages**: the simplest option.
-- **Custom**: `@channelname` or a chat ID. A private channel just for results works well.
+The **Push channels** card in Settings manages them all; in each strategy tick which channels to **push to**. Ticking none only records. One failing channel never blocks the others, and the reason shows on the strategy card.
+
+**Built-in**
+
+- **Telegram chat**: sent with your logged-in account. Choose the target in the Telegram card's "Push to": Saved Messages, or a custom `@channel` / chat ID (a private channel just for you works well).
+- **Email**: reuses the Resend key and recipient from "Email recovery"; available once configured.
+
+**Custom** (press "Add channel"; each has a Test button that really sends a test message)
+
+| Type | Fields | How to get them |
+| --- | --- | --- |
+| Telegram bot | Bot Token, Chat ID | Create a bot with @BotFather; message it once; Chat ID is your numeric ID or a channel `@name` (the bot must be a channel admin) |
+| Webhook | Format, URL, optional signing secret for Feishu / DingTalk | Feishu: group settings → bots → custom bot; DingTalk: group settings → custom robot; WeCom: group → add group bot; Discord: channel settings → integrations → webhooks; Slack: Incoming Webhooks. If the bot has signing enabled put its secret in the signing field; DingTalk's "custom keyword" security needs the keyword in the message |
+| Bark | Key, optional server | Install Bark on iOS and copy the key; set the server if self-hosted |
+| ServerChan | SendKey | From [ServerChan Turbo](https://sct.ftqq.com/); pushes to WeChat |
+| ntfy | Topic, optional server and token | Subscribe to a topic in the ntfy app; public server is ntfy.sh, or self-host |
+
+The "generic JSON" format POSTs `{title, text, link, strategy, chat, reason, ts}` so you can wire in your own service.
+
+Quotas and pricing of third-party services are theirs to define: ntfy's public server is documented as free with rate limits, Bark is open source and self-hostable, ServerChan's free quota is very limited. Sensitive fields (URLs, keys) are shown only as a masked tail after saving.
 
 ### AI
 
@@ -223,7 +242,7 @@ Other:
 
 - **Account risk**: logging in to a user account with a program is not an official Telegram client and may violate its terms; the account may be restricted, frozen or banned. Being read-only (it only sends notifications to your push target) lowers the risk but does not remove it. Use an account whose risk you accept; the author is not responsible for any consequences.
 - **Compliance**: follow Telegram's terms and your local laws. This project is for individuals processing messages they can already see; it must **not** be used for harassment, spam, bulk collection of other people's data or anything illegal.
-- **Data leaving your account**: AI strategies send message text to the AI service you configure; the proxy test contacts the third-party ip-api.com.
+- **Data leaving your account**: AI strategies send message text to the AI service you configure; matched messages go to the push channels you pick (including third parties such as Feishu, DingTalk, ServerChan, Bark); the proxy test contacts the third-party ip-api.com.
 - **Prompt injection**: message content is untrusted input. The system prompt tells the AI to only judge and never follow instructions inside messages, but it can still be misled; treat results as hints.
 - The software is provided "as is" without warranty; see [LICENSE](LICENSE).
 
@@ -271,6 +290,7 @@ src/
   sockets.js   Worker socket adapter, SOCKS5, proxy test
   run.js       scheduled runs, manual tasks, failure alerts
   match.js     keyword matching, AI calls
+  notify.js    push channels (Telegram bot, Webhook, Bark, ServerChan, ntfy)
   db.js        D1 schema and data access
   page.html    console page
 ```
